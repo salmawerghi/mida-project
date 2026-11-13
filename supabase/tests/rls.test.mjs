@@ -292,3 +292,16 @@ test('US02 · le jeton de connexion contient le rôle', async () => {
     await assert.rejects(lignes(`select public.custom_access_token_hook('{}'::jsonb)`), /permission denied/);
   });
 });
+
+test('US02 · les fonctions serveur (service_role) peuvent modifier les champs protégés', async () => {
+  await debut();
+  try {
+    await db.exec('set local role service_role');
+    assert.equal(await nbModifiees(`update public.profiles set etat_compte = 'actif' where email = 'yassine@mida.test'`), 1);
+    assert.equal(await nbModifiees(`update public.restaurants set etat = 'actif' where nom = 'Lella Béya'`), 1);
+    assert.equal(await nbModifiees(`update public.documents_livreur set etat = 'valide' where etat = 'en_attente'`), 3);
+    assert.equal(await nbModifiees(`update public.notifications set message = 'texte serveur'`), 3);
+  } finally {
+    await fin();
+  }
+});

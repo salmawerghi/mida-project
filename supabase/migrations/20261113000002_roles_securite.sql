@@ -60,7 +60,7 @@ create trigger creer_profil_apres_inscription
 -- « security definer » : elles lisent les tables sans repasser par la RLS,
 -- ce qui évite les boucles (une règle sur profiles qui lit profiles).
 create schema if not exists private;
-grant usage on schema private to anon, authenticated;
+grant usage on schema private to anon, authenticated, service_role;
 
 create function private.role_actuel()
 returns public.role_utilisateur
@@ -160,7 +160,6 @@ as $$
   );
 $$;
 
-grant execute on all functions in schema private to anon, authenticated;
 
 -- ---------------------------------------------------------------------
 -- 3. Champs que seul l'administrateur peut modifier
@@ -477,3 +476,8 @@ create policy "profil : lecture par le service d'authentification" on public.pro
 -- Les fonctions de déclenchement ne doivent pas être appelables par l'API
 revoke execute on function public.creer_profil_nouvel_utilisateur() from anon, authenticated, public;
 revoke execute on function public.maj_updated_at() from anon, authenticated, public;
+
+-- Les fonctions d'aide et de protection sont appelées par les règles et les
+-- déclencheurs : les applications et les fonctions serveur doivent pouvoir
+-- les exécuter (placé en fin de fichier, après leur création).
+grant execute on all functions in schema private to anon, authenticated, service_role;

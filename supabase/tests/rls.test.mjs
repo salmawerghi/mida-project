@@ -42,11 +42,15 @@ async function requete(sql, params) {
   }
 }
 
-/** Exécute fn en tant qu'utilisateur (ou visiteur si email = null), puis annule tout. */
-async function en(utilisateur, fn) {
+/**
+ * Exécute fn en tant qu'utilisateur (ou visiteur si email = null), puis annule tout.
+ * `preparation` (SQL facultatif) est exécuté avant, avec tous les droits.
+ */
+async function en(utilisateur, fn, preparation) {
   await debut();
 
   try {
+    if (preparation) await db.exec(preparation);
     if (utilisateur === null) {
       await db.exec('set local role anon');
     } else {
@@ -304,4 +308,121 @@ test('US02 · les fonctions serveur (service_role) peuvent modifier les champs p
   } finally {
     await fin();
   }
+});
+
+// =====================================================================
+// US03 — stockage des images
+// =====================================================================
+const R_ZITOUNA = '10000000-0000-4000-8000-000000000001';
+const R_KANOUN = '10000000-0000-4000-8000-000000000002';
+const envoyer = (bucket, nom) =>
+  requete(`insert into storage.objects (bucket_id, name, owner) values ($1, $2, auth.uid())`, [bucket, nom]);
+const remplacer = (bucket, nom) =>
+  nbModifiees(`update storage.objects set metadata = '{"v": 2}', updated_at = now()
+               where bucket_id = $1 and name = $2`, [bucket, nom]);
+const supprimer = (bucket, nom) =>
+  nbModifiees(`delete from storage.objects where bucket_id = $1 and name = $2`, [bucket, nom]);
+const RLS = /row-level security/;
+// fichiers déjà présents avant chaque scénario
+const FICHIERS_EXISTANTS = `insert into storage.objects (bucket_id, name) values
+  ('restaurants', '${R_KANOUN}/logo.webp'),
+  ('restaurants', '${R_ZITOUNA}/logo.webp')`;
+
+test('US03 · les trois espaces de stockage sont configurés', async () => {
+  const b = await lignes(`select id, public, file_size_limit::int as taille, allowed_mime_types as formats
+                          from storage.buckets order by id`);
+  assert.deepEqual(b.map((x) => [x.id, x.public, x.taille]), [
+    ['avatars', true, 2097152],
+    ['documents-livreurs', false, 10485760],
+    ['restaurants', true, 5242880],
+  ]);
+  assert.ok(b.every((x) => x.formats.includes('image/webp')));
+  assert.ok(b.find((x) => x.id === 'documents-livreurs').formats.includes('application/pdf'));
+});
+
+test('US03 · un restaurant envoie et remplace ses propres images', async () => {
+  await en('zitouna', async () => {
+    await envoyer('restaurants', `${R_ZITOUNA}/couverture.webp`);
+    await envoyer('restaurants', `${R_ZITOUNA}/plats/40000000-0000-4000-8000-000000000001.webp`);
+    assert.equal(await remplacer('restaurants', `${R_ZITOUNA}/logo.webp`), 1);
+    // il retrouve ses fichiers (nécessaire pour remplacer un fichier existant)
+    const [{ n }] = await lignes(`select count(*)::int as n from storage.objects where bucket_id = 'restaurants'`);
+    assert.equal(n, 3);
+  }, FICHIERS_EXISTANTS);
+});
+
+test('US03 · seul le propriétaire peut remplacer une image de restaurant', async () => {
+  await en('zitouna', async () => {
+    // pas d'envoi dans le dossier d'El Kanoun
+    await assert.rejects(envoyer('restaurants', `${R_KANOUN}/logo2.webp`), RLS);
+    // ni remplacement, ni suppression de son logo (aucune ligne touchée)
+    assert.equal(await remplacer('restaurants', `${R_KANOUN}/logo.webp`), 0);
+    assert.equal(await supprimer('restaurants', `${R_KANOUN}/logo.webp`), 0);
+    // un chemin sans dossier de restaurant est refusé
+    await assert.rejects(envoyer('restaurants', 'logo.webp'), RLS);
+    await assert.rejects(envoyer('restaurants', 'pas-un-id/logo.webp'), RLS);
+  }, FICHIERS_EXISTANTS);
+  // un client et un visiteur ne peuvent rien envoyer
+  await en('amine', async () => {
+    await assert.rejects(envoyer('restaurants', `${R_ZITOUNA}/pirate.webp`), RLS);
+    assert.equal(await remplacer('restaurants', `${R_ZITOUNA}/logo.webp`), 0);
+  }, FICHIERS_EXISTANTS);
+  await en(null, async () => {
+    await assert.rejects(envoyer('restaurants', `${R_ZITOUNA}/pirate.webp`), RLS);
+  });
+  // l'administrateur peut intervenir sur toutes les images
+  await en('admin', async () => {
+    assert.equal(await remplacer('restaurants', `${R_KANOUN}/logo.webp`), 1);
+  }, FICHIERS_EXISTANTS);
+});
+
+test('US03 · un restaurant bloqué ne gère plus ses images', async () => {
+  await en('zitouna', async () => {
+    await assert.rejects(envoyer('restaurants', `${R_ZITOUNA}/couverture.webp`), RLS);
+  }, `update public.profiles set etat_compte = 'bloque' where email = 'zitouna@mida.test'`);
+});
+
+test('US03 · chacun gère uniquement sa photo de profil', async () => {
+  await en('amine', async () => {
+    await envoyer('avatars', `${ids.amine}/avatar.webp`);
+    assert.equal(await remplacer('avatars', `${ids.amine}/avatar.webp`), 1);
+    await assert.rejects(envoyer('avatars', `${ids.leila}/avatar.webp`), RLS);
+  });
+  await en('amine', async () => {
+    assert.equal(await remplacer('avatars', `${ids.leila}/avatar.webp`), 0);
+    assert.equal(await supprimer('avatars', `${ids.leila}/avatar.webp`), 0);
+  }, `insert into storage.objects (bucket_id, name) values ('avatars', '${ids.leila}/avatar.webp')`);
+});
+
+test('US03 · documents des livreurs : privés et figés une fois validés', async () => {
+  const docs = `insert into storage.objects (bucket_id, name) values
+    ('documents-livreurs', '${ids.sami}/cin.pdf'),
+    ('documents-livreurs', '${ids.yassine}/cin.pdf')`;
+  // Yassine (en attente) remplace sa CIN encore en attente de validation
+  await en('yassine', async () => {
+    assert.equal(await remplacer('documents-livreurs', `${ids.yassine}/cin.pdf`), 1);
+    await envoyer('documents-livreurs', `${ids.yassine}/photo.jpg`);
+  }, docs);
+  // Sami ne peut plus remplacer ni supprimer sa CIN validée, mais peut ajouter un document manquant
+  await en('sami', async () => {
+    assert.equal(await remplacer('documents-livreurs', `${ids.sami}/cin.pdf`), 0);
+    assert.equal(await supprimer('documents-livreurs', `${ids.sami}/cin.pdf`), 0);
+    await assert.rejects(envoyer('documents-livreurs', `${ids.sami}/cin.png`), RLS);
+    // pas de contournement par un sous-dossier
+    await assert.rejects(envoyer('documents-livreurs', `${ids.sami}/x/cin.pdf`), RLS);
+    await envoyer('documents-livreurs', `${ids.sami}/carte_grise.pdf`);
+  }, docs);
+  // un autre livreur ne les voit pas, un client ne peut pas en envoyer
+  await en('karim', async () => {
+    const vus = await lignes(`select name from storage.objects where bucket_id = 'documents-livreurs'`);
+    assert.deepEqual(vus, []);
+  }, docs);
+  await en('amine', async () => {
+    await assert.rejects(envoyer('documents-livreurs', `${ids.amine}/cin.pdf`), RLS);
+  });
+  // l'administrateur les consulte tous
+  await en('admin', async () => {
+    const [{ n }] = await lignes(`select count(*)::int as n from storage.objects where bucket_id = 'documents-livreurs'`);
+    assert.equal(n, 2);
+  }, docs);
 });

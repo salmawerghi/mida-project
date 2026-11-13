@@ -143,11 +143,11 @@ begin
     where id = u_yassine;
 
   insert into public.documents_livreur (livreur_id, type, fichier_url, etat) values
-    (u_sami,    'cin',         'documents/' || u_sami    || '/cin.pdf',         'valide'),
-    (u_sami,    'permis',      'documents/' || u_sami    || '/permis.jpg',      'valide'),
-    (u_yassine, 'cin',         'documents/' || u_yassine || '/cin.pdf',         'en_attente'),
-    (u_yassine, 'permis',      'documents/' || u_yassine || '/permis.jpg',      'en_attente'),
-    (u_yassine, 'carte_grise', 'documents/' || u_yassine || '/carte_grise.pdf', 'en_attente')
+    (u_sami,    'cin',         u_sami || '/cin.pdf',         'valide'),
+    (u_sami,    'permis',      u_sami || '/permis.jpg',      'valide'),
+    (u_yassine, 'cin',         u_yassine || '/cin.pdf',         'en_attente'),
+    (u_yassine, 'permis',      u_yassine || '/permis.jpg',      'en_attente'),
+    (u_yassine, 'carte_grise', u_yassine || '/carte_grise.pdf', 'en_attente')
   on conflict (livreur_id, type) do nothing;
 
   -- Paramètres de la plateforme ---------------------------------------

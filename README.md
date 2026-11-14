@@ -23,7 +23,7 @@ apps/
 | US01 | Base de données : 18 tables du §9 (+ livreurs, documents, horaires, paramètres, réclamations, notifications, jetons d'appareil), relations et contraintes, jeu de test | fait, testé en local |
 | US02 | 4 rôles (client, livreur, responsable, admin), RLS sur toutes les tables, protection des champs réservés à l'admin, rôle dans le JWT | fait, testé en local |
 | US03 | Stockage des images : 3 buckets (restaurants, avatars, documents-livreurs), seul le propriétaire envoie/remplace ses fichiers | fait, testé en local |
-| US04 | Appli client : inscription (nom, e-mail, téléphone +216, mot de passe), connexion, session conservée, déconnexion ; comptes non clients ou bloqués refusés | en cours : compile, 24 tests OK, essai réel à faire |
+| US04 | Appli client : inscription (nom, e-mail, téléphone +216, mot de passe), connexion, session conservée, déconnexion ; comptes non clients ou bloqués refusés | fait : 24 tests OK, essayé sur émulateur avec le vrai projet Supabase |
 
 US01 à US03 sont appliquées sur le projet Supabase de Mida (`tpfpuwlgnxhwhezicuto`) ; le jeu de test n'y est pas encore chargé.
 
@@ -103,3 +103,6 @@ flutter run         # se connecte au projet Supabase de Mida (lib/config.dart)
 - L'inscription crée un compte de rôle `client` ; le profil (`profiles`) est rempli par le déclencheur de la migration US02.
 - Côté Supabase (Authentication → Sign In / Providers) : si « Confirm email » est activé, l'appli affiche « lien de confirmation envoyé » et il faut cliquer le lien avant de se connecter. Pour les essais, le désactiver, ou régler la Site URL.
 - Les comptes livreur, responsable, admin ou bloqués sont déconnectés aussitôt avec un message qui indique la bonne application.
+- « Confirm email » est **désactivé** sur le projet Mida (essais) : l'inscription ouvre directement la session. À réactiver avant une vraie mise en service.
+- Essai du 14/11/2026 sur émulateur Android (Pixel 7) : inscription, ligne `profiles` créée (rôle `client`, téléphone `+216 22 145 870`), session conservée après fermeture de l'appli, déconnexion, mauvais mot de passe, connexion. Compte d'essai : `test.us04@mida.test` / `Us04Mida7k2q`. Pas encore essayé : le refus d'un compte livreur/responsable (aucun compte de ce type en ligne tant que `seed.sql` n'est pas chargé).
+- Si la compilation Android échoue sur le cache Kotlin (« Could not close incremental caches ») : c'est le projet sur `D:` et le cache pub sur `C:` ; `kotlin.incremental=false` est déjà dans `android/gradle.properties`.

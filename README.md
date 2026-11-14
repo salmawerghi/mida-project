@@ -12,6 +12,8 @@ supabase/
     20261113000003_stockage_images.sql US03 : stockage des images (buckets + règles d'accès)
   seed.sql                             jeu de données de test (données des maquettes)
   tests/                               tests automatiques des migrations (PGlite, sans Docker)
+apps/
+  client/                              application mobile client (Flutter)
 ```
 
 ## Avancement du backlog
@@ -21,6 +23,7 @@ supabase/
 | US01 | Base de données : 18 tables du §9 (+ livreurs, documents, horaires, paramètres, réclamations, notifications, jetons d'appareil), relations et contraintes, jeu de test | fait, testé en local |
 | US02 | 4 rôles (client, livreur, responsable, admin), RLS sur toutes les tables, protection des champs réservés à l'admin, rôle dans le JWT | fait, testé en local |
 | US03 | Stockage des images : 3 buckets (restaurants, avatars, documents-livreurs), seul le propriétaire envoie/remplace ses fichiers | fait, testé en local |
+| US04 | Appli client : inscription (nom, e-mail, téléphone +216, mot de passe), connexion, session conservée, déconnexion ; comptes non clients ou bloqués refusés | en cours : compile, 24 tests OK, essai réel à faire |
 
 US01 à US03 sont appliquées sur le projet Supabase de Mida (`tpfpuwlgnxhwhezicuto`) ; le jeu de test n'y est pas encore chargé.
 
@@ -86,3 +89,17 @@ npm test
 ```
 
 Les tests chargent les migrations et le seed dans un PostgreSQL embarqué (PGlite) avec une imitation minimale de l'authentification Supabase (`tests/supabase-stub.sql`), puis vérifient chaque règle en se connectant avec chaque rôle. Ils ne remplacent pas un essai sur un vrai projet Supabase (connexion réelle, JWT).
+
+## Application client (US04)
+
+```bash
+cd apps/client
+flutter pub get
+flutter test        # règles de saisie, messages d'erreur, rôle du jeton, écran d'inscription
+flutter run         # se connecte au projet Supabase de Mida (lib/config.dart)
+```
+
+- `google_fonts` est fixé en **^8.0.0** : la version 9 utilise le paquet séparé `material_ui`, dont la classe `TextTheme` est différente de celle de `package:flutter/material.dart` (erreur de type dans `lib/theme.dart`).
+- L'inscription crée un compte de rôle `client` ; le profil (`profiles`) est rempli par le déclencheur de la migration US02.
+- Côté Supabase (Authentication → Sign In / Providers) : si « Confirm email » est activé, l'appli affiche « lien de confirmation envoyé » et il faut cliquer le lien avant de se connecter. Pour les essais, le désactiver, ou régler la Site URL.
+- Les comptes livreur, responsable, admin ou bloqués sont déconnectés aussitôt avec un message qui indique la bonne application.

@@ -1,0 +1,54 @@
+import type { ReactElement } from 'react'
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router'
+
+import { pageDuCompte, type Compte, type ServiceRestaurant } from './auth/service'
+import { FournisseurSession, useSession } from './auth/session'
+import { Chargement } from './composants'
+import Attente from './pages/Attente'
+import Connexion from './pages/Connexion'
+import Inscription from './pages/Inscription'
+import Tableau from './pages/Tableau'
+
+/**
+ * Page réservée aux responsables connectés. Sans session : retour à la
+ * connexion. Connecté mais pas sur la bonne page pour l'état de son
+ * restaurant (pas encore inscrit, en attente, validé) : redirection.
+ */
+export function PageProtegee({ page, rendu }: { page: '/attente' | '/tableau'; rendu: (compte: Compte) => ReactElement }) {
+  const { etat } = useSession()
+  const location = useLocation()
+  if (etat.statut === 'chargement') return <Chargement />
+  if (etat.statut === 'deconnecte') return <Navigate to="/connexion" replace state={{ depuis: location.pathname }} />
+  const attendue = pageDuCompte(etat.compte)
+  if (attendue !== page) return <Navigate to={attendue} replace />
+  return rendu(etat.compte)
+}
+
+function Accueil() {
+  const { etat } = useSession()
+  if (etat.statut === 'chargement') return <Chargement />
+  return <Navigate to={etat.statut === 'connecte' ? pageDuCompte(etat.compte) : '/connexion'} replace />
+}
+
+export function Routage() {
+  return (
+    <Routes>
+      <Route path="/" element={<Accueil />} />
+      <Route path="/connexion" element={<Connexion />} />
+      <Route path="/inscription" element={<Inscription />} />
+      <Route path="/attente" element={<PageProtegee page="/attente" rendu={(c) => <Attente compte={c} />} />} />
+      <Route path="/tableau" element={<PageProtegee page="/tableau" rendu={(c) => <Tableau compte={c} />} />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  )
+}
+
+export default function App({ service }: { service: ServiceRestaurant }) {
+  return (
+    <FournisseurSession service={service}>
+      <BrowserRouter>
+        <Routage />
+      </BrowserRouter>
+    </FournisseurSession>
+  )
+}

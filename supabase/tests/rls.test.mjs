@@ -222,6 +222,35 @@ test('US02 · un responsable inscrit son restaurant, toujours « en attente »',
   }
 });
 
+test('US05 · restaurant en attente : visible de son responsable seulement, un seul par compte', async () => {
+  await debut();
+  try {
+    await db.exec(`insert into auth.users (id, email, raw_user_meta_data) values
+      ('f0000000-0000-4000-8000-000000000010', 'resto10@mida.test', '{"role": "responsable", "nom": "R10"}')`);
+    await db.query("select set_config('request.jwt.claim.sub', 'f0000000-0000-4000-8000-000000000010', true)");
+    await db.exec('set local role authenticated');
+    await requete(`insert into public.restaurants (responsable_id, nom, adresse, ville)
+                   values (auth.uid(), 'Chez R10', '2 rue', 'Sousse')`);
+    // le responsable relit son restaurant en attente (écran « En attente de validation »)
+    assert.deepEqual(await lignes(`select nom, etat::text from public.restaurants where responsable_id = auth.uid()`),
+                     [{ nom: 'Chez R10', etat: 'en_attente' }]);
+    // un seul restaurant par compte responsable
+    await assert.rejects(lignes(`insert into public.restaurants (responsable_id, nom, adresse, ville)
+                                 values (auth.uid(), 'Deuxième', '3 rue', 'Sousse')`), /unique|duplicate/i);
+    // ni les visiteurs ni les clients ne le voient avant validation
+    await db.exec('reset role');
+    await db.query("select set_config('request.jwt.claim.sub', '', true)"); // un visiteur n'a pas d'identifiant
+    await db.exec('set local role anon');
+    assert.deepEqual(await lignes(`select id from public.restaurants where nom = 'Chez R10'`), []);
+    await db.exec('reset role');
+    await db.query("select set_config('request.jwt.claim.sub', $1, true)", [ids.amine]);
+    await db.exec('set local role authenticated');
+    assert.deepEqual(await lignes(`select id from public.restaurants where nom = 'Chez R10'`), []);
+  } finally {
+    await fin();
+  }
+});
+
 test('US02 · livreurs : courses proposées visibles seulement par les livreurs validés', async () => {
   assert.deepEqual(await en('sami', numeros), [1040, 1042, 1044]);    // ses courses + la course proposée
   assert.deepEqual(await en('karim', numeros), [1044, 1046]);

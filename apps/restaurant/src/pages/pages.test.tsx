@@ -22,7 +22,7 @@ function ouvrir(chemin: string, service: FauxService) {
 const enAttente: Compte = {
   email: 'contact@darzitouna.tn',
   nom: 'Mehdi Ben Salem',
-  restaurant: { id: 'r1', nom: 'Dar Zitouna', ville: 'Tunis', etat: 'en_attente', motif_rejet: null },
+  restaurant: { id: 'r1', nom: 'Dar Zitouna', ville: 'Tunis', etat: 'en_attente', motif_rejet: null, ouvert: false },
 }
 
 async function remplirEtape1(u: ReturnType<typeof userEvent.setup>) {

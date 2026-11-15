@@ -10,6 +10,7 @@ supabase/
     20261113000001_schema.sql          US01 : tables, relations, contraintes
     20261113000002_roles_securite.sql  US02 : rôles, règles d'accès (RLS), rôle dans le jeton
     20261113000003_stockage_images.sql US03 : stockage des images (buckets + règles d'accès)
+    20261115000001_ouverture_restaurant.sql US08 : ouvert / fermé, pas de commande pour un restaurant fermé
   seed.sql                             jeu de données de test (données des maquettes)
   tests/                               tests automatiques des migrations (PGlite, sans Docker)
 apps/
@@ -28,8 +29,9 @@ apps/
 | US05 | Espace restaurant web : inscription en 2 étapes (responsable puis restaurant), compte et restaurant « en attente » de validation, connexion, écran d'attente ou de refus (avec motif), pages réservées aux responsables connectés | fait : 27 tests Vitest + test PGlite, essayé avec le vrai projet Supabase |
 | US06 | Mot de passe oublié (appli client) : e-mail → code reçu par e-mail → nouveau mot de passe, puis session ouverte | codé, 13 tests OK ; **lien masqué** dans l'appli et essai réel en attente du réglage e-mail de Supabase (voir plus bas) |
 | US07 | Profil du restaurant (espace web) : nom, catégorie, adresse, ville, téléphone, description, logo et horaires des 7 jours ; ouvert dès l'inscription, même avant la validation | codé : 21 tests Vitest + 5 tests PGlite ; essai réel à faire |
+| US08 | Ouvrir ou fermer son restaurant en un clic (interrupteur du menu de l'espace web) ; un restaurant fermé ou non validé ne reçoit plus de nouvelle commande | codé : 4 tests Vitest + 4 tests PGlite, migration appliquée sur Supabase ; essai réel à faire (il faut un restaurant validé) ; affichage côté client avec le catalogue |
 
-US01 à US03 sont appliquées sur le projet Supabase de Mida (`tpfpuwlgnxhwhezicuto`) ; le jeu de test n'y est pas encore chargé.
+US01 à US03 et US08 sont appliquées sur le projet Supabase de Mida (`tpfpuwlgnxhwhezicuto`) ; le jeu de test n'y est pas encore chargé.
 
 ## Appliquer sur un projet Supabase
 
@@ -40,7 +42,8 @@ Méthode simple, depuis le tableau de bord Supabase (**SQL Editor**), dans cet o
 1. `supabase/migrations/20261113000001_schema.sql`
 2. `supabase/migrations/20261113000002_roles_securite.sql`
 3. `supabase/migrations/20261113000003_stockage_images.sql`
-4. `supabase/seed.sql` (données de test, facultatif)
+4. `supabase/migrations/20261115000001_ouverture_restaurant.sql`
+5. `supabase/seed.sql` (données de test, facultatif)
 
 Puis activer le rôle dans le jeton : **Authentication → Hooks → Custom Access Token** → `public.custom_access_token_hook`.
 
@@ -117,7 +120,7 @@ flutter run         # se connecte au projet Supabase de Mida (lib/config.dart)
 cd apps/restaurant
 npm install
 npm run dev         # http://localhost:5173 — se connecte au projet Supabase de Mida (src/config.ts)
-npm test            # 48 tests (Vitest)
+npm test            # 52 tests (Vitest)
 npm run build       # vérification TypeScript + version de production dans dist/
 ```
 
@@ -137,6 +140,15 @@ Page `/profil` (`src/pages/Profil.tsx`), dans le cadre à menu latéral (`src/Ca
 - **Accès** : dès que le restaurant est inscrit, même en attente ou refusé (lien sur la page d'attente). Les clients ne voient le restaurant et ses horaires qu'une fois validé (règles US02) ; pour un restaurant validé, la modification est visible tout de suite, sans autre étape.
 - Pas de migration : les règles d'accès des US02 et US03 suffisent (vérifié par les tests « US07 » de `supabase/tests`).
 - Reportés : photo de couverture, position sur la carte, matricule fiscal ; l'interrupteur ouvert / fermé est la story US08.
+
+### Ouvert / fermé en un clic (US08)
+
+- Dans le menu latéral (`src/Cadre.tsx`), sous le nom du restaurant : un interrupteur vert « Restaurant ouvert » / rouge « Restaurant fermé », visible sur toutes les pages. Il n'apparaît que pour un restaurant validé ; un nouveau restaurant validé démarre **fermé** (le tableau de bord le rappelle).
+- L'interrupteur modifie `restaurants.ouvert`. Cette colonne est lisible par les visiteurs et les clients pour tout restaurant validé : l'appli client l'affichera avec le catalogue des restaurants (pas encore développé).
+- Garanties de la base (migration `20261115000001`) :
+  - un restaurant ouvert est forcément validé (contrainte) ; le responsable d'un restaurant en attente reçoit un refus, et bloquer ou refuser un restaurant le ferme automatiquement ;
+  - **aucune nouvelle commande** (état `en_attente`) ne peut être créée pour un restaurant fermé ou non validé, même par une fonction serveur (déclencheur `restaurant_ouvert` sur `commandes`). Les commandes déjà passées continuent leur vie après la fermeture. La future fonction « passer commande » devra afficher ce refus au client.
+- L'interrupteur est manuel : il ne suit pas les horaires d'ouverture (US07).
 
 ## Mot de passe oublié (US06) — en attente du réglage e-mail
 

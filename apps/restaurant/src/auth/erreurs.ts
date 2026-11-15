@@ -50,7 +50,13 @@ export function messageErreur(erreur: unknown): string {
   if (typeof erreur === 'object' && erreur !== null && 'code' in erreur) {
     const code = String((erreur as { code: unknown }).code)
     if (code === '23505') return 'Ce compte a déjà inscrit un restaurant.'
-    if (code === '42501') return "Ce compte n'a pas le droit de faire cette action."
+    if (code === '42501') {
+      const message = String((erreur as { message?: unknown }).message ?? '')
+      if (message.includes('avant de pouvoir ouvrir')) {
+        return "Votre restaurant doit être validé par l'équipe Mida avant de pouvoir ouvrir."
+      }
+      return "Ce compte n'a pas le droit de faire cette action."
+    }
     if (code === '23514') return 'Une information du restaurant est invalide. Vérifiez le formulaire.'
   }
   return 'Une erreur est survenue. Réessayez dans un instant.'

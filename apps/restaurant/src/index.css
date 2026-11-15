@@ -611,8 +611,13 @@ textarea.saisie {
   font-weight: 600;
   box-shadow: 0 4px 0 var(--bleu-fonce);
 }
-.cadre-compte {
+.cadre-bas {
   margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.cadre-compte {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -640,6 +645,62 @@ textarea.saisie {
 }
 .cadre-contenu h1 {
   font-size: 32px;
+}
+
+/* ---------- Interrupteur ouvert / fermé (US08) ---------- */
+.ouverture {
+  background: var(--bleu-fonce);
+  border-radius: 18px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ouverture-nom {
+  font: 700 18px var(--titre);
+  overflow-wrap: anywhere;
+}
+.interrupteur {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-direction: row-reverse;
+  gap: 10px;
+  height: 44px;
+  padding: 0 14px 0 6px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--harissa);
+  color: #fff;
+  font: 600 14px var(--corps);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.interrupteur-ouvert {
+  flex-direction: row;
+  padding: 0 6px 0 14px;
+  background: var(--succes);
+}
+.interrupteur:disabled {
+  cursor: progress;
+  opacity: 0.8;
+}
+.interrupteur-rond {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #fff;
+}
+.ouverture-effet {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--bleu-clair);
+}
+.ouverture-erreur {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--dore-clair);
 }
 
 /* ---------- Profil du restaurant (US07) ---------- */

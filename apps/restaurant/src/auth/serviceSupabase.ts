@@ -71,7 +71,7 @@ export class ServiceRestaurantSupabase implements ServiceRestaurant {
 
     const { data: restaurant, error: erreurResto } = await this.client
       .from('restaurants')
-      .select('id, nom, ville, etat, motif_rejet')
+      .select('id, nom, ville, etat, motif_rejet, ouvert')
       .eq('responsable_id', id)
       .maybeSingle<Restaurant>()
     if (erreurResto) throw erreurResto
@@ -153,6 +153,12 @@ export class ServiceRestaurantSupabase implements ServiceRestaurant {
 
   async deconnecter(): Promise<void> {
     await this.client.auth.signOut()
+  }
+
+  async changerOuverture(restaurantId: string, ouvert: boolean): Promise<void> {
+    const { data, error } = await this.client.from('restaurants').update({ ouvert }).eq('id', restaurantId).select('id')
+    if (error) throw error
+    if (!data?.length) throw new ErreurMida(messageModificationRefusee)
   }
 
   async profilRestaurant(): Promise<ProfilEtHoraires> {

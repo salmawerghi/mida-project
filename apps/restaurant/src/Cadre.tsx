@@ -1,7 +1,8 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { NavLink } from 'react-router'
 
-import { pageDuCompte, type Compte } from './auth/service'
+import { messageErreur } from './auth/erreurs'
+import { pageDuCompte, type Compte, type Restaurant } from './auth/service'
 import { useSession } from './auth/session'
 import { Logo } from './composants'
 
@@ -32,18 +33,82 @@ export default function Cadre({ compte, children }: { compte: Compte; children: 
             Profil du restaurant
           </NavLink>
         </nav>
-        <div className="cadre-compte">
-          <span>
-            {compte.nom}
-            <br />
-            {compte.email}
-          </span>
-          <button type="button" className="bouton bouton-blanc bouton-petit" onClick={() => void service.deconnecter()}>
-            Se déconnecter
-          </button>
+        <div className="cadre-bas">
+          {compte.restaurant && <Ouverture restaurant={compte.restaurant} />}
+          <div className="cadre-compte">
+            <span>
+              {compte.nom}
+              <br />
+              {compte.email}
+            </span>
+            <button type="button" className="bouton bouton-blanc bouton-petit" onClick={() => void service.deconnecter()}>
+              Se déconnecter
+            </button>
+          </div>
         </div>
       </aside>
       <main className="cadre-contenu">{children}</main>
+    </div>
+  )
+}
+
+/**
+ * Interrupteur « ouvert / fermé » (US08) : un clic suffit, et un restaurant
+ * fermé ne reçoit plus de commande. Réservé aux restaurants validés.
+ */
+function Ouverture({ restaurant }: { restaurant: Restaurant }) {
+  const { service, rafraichir } = useSession()
+  // valeur demandée, affichée tout de suite en attendant la réponse de Supabase
+  const [demande, setDemande] = useState<boolean | null>(null)
+  const [erreur, setErreur] = useState<string | null>(null)
+  const ouvert = demande ?? restaurant.ouvert
+
+  async function basculer() {
+    const suivant = !ouvert
+    setErreur(null)
+    setDemande(suivant)
+    try {
+      await service.changerOuverture(restaurant.id, suivant)
+      await rafraichir()
+    } catch (e) {
+      setErreur(messageErreur(e))
+    } finally {
+      setDemande(null)
+    }
+  }
+
+  return (
+    <div className="ouverture">
+      <div className="ouverture-nom">{restaurant.nom}</div>
+      {restaurant.etat === 'actif' ? (
+        <>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={ouvert}
+            aria-describedby="ouverture-effet"
+            className={ouvert ? 'interrupteur interrupteur-ouvert' : 'interrupteur'}
+            disabled={demande !== null}
+            onClick={() => void basculer()}
+          >
+            {ouvert ? 'Restaurant ouvert' : 'Restaurant fermé'}
+            <span className="interrupteur-rond" aria-hidden="true" />
+          </button>
+          <span id="ouverture-effet" className="ouverture-effet">
+            {ouvert ? 'Les clients peuvent commander.' : 'Les clients ne peuvent pas commander.'}
+          </span>
+          {erreur && (
+            <span className="ouverture-erreur" role="alert">
+              {erreur}
+            </span>
+          )}
+        </>
+      ) : (
+        <span className="ouverture-effet">
+          {restaurant.etat === 'rejete' ? 'Demande refusée.' : 'En attente de validation.'} Vous pourrez ouvrir le
+          restaurant une fois qu'il sera validé.
+        </span>
+      )}
     </div>
   )
 }

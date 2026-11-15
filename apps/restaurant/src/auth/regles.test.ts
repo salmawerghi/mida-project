@@ -84,7 +84,7 @@ describe('pageDuCompte', () => {
   const compte = (etat: 'en_attente' | 'actif' | 'rejete' | null): Compte => ({
     email: 'a@b.tn',
     nom: 'A',
-    restaurant: etat ? { id: 'r', nom: 'R', ville: 'Tunis', etat, motif_rejet: null } : null,
+    restaurant: etat ? { id: 'r', nom: 'R', ville: 'Tunis', etat, motif_rejet: null, ouvert: false } : null,
   })
   it('selon l’état du restaurant', () => {
     expect(pageDuCompte(compte(null))).toBe('/inscription')

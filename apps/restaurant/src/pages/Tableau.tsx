@@ -14,6 +14,12 @@ export default function Tableau({ compte }: { compte: Compte }) {
           Connecté en tant que {compte.nom} ({compte.email}). Les commandes, le menu et les statistiques arrivent ici
           avec les prochaines versions.
         </p>
+        {compte.restaurant && !compte.restaurant.ouvert && (
+          <p className="message message-note">
+            Votre restaurant est <strong>fermé</strong> : les clients ne peuvent pas commander. Ouvrez-le avec
+            l'interrupteur « Restaurant fermé », dans le menu.
+          </p>
+        )}
         <div className="actions" style={{ justifyContent: 'flex-start' }}>
           <Link to="/profil" className="bouton bouton-bleu">
             Profil du restaurant

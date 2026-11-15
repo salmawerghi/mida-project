@@ -40,6 +40,12 @@ export class FauxService implements ServiceRestaurant {
     this.prevenir()
   })
 
+  erreurOuverture: unknown = null
+  changerOuverture = vi.fn(async (_id: string, ouvert: boolean) => {
+    if (this.erreurOuverture) throw this.erreurOuverture
+    if (this.compte?.restaurant) this.compte = { ...this.compte, restaurant: { ...this.compte.restaurant, ouvert } }
+  })
+
   /** Profil renvoyé par `profilRestaurant` (US07). */
   profil: ProfilRestaurant = {
     id: 'r1',
@@ -100,6 +106,6 @@ export class FauxService implements ServiceRestaurant {
   }
 
   private restaurantDe(r: InfosRestaurant) {
-    return { id: 'r1', nom: r.nom.trim(), ville: r.ville, etat: 'en_attente' as const, motif_rejet: null }
+    return { id: 'r1', nom: r.nom.trim(), ville: r.ville, etat: 'en_attente' as const, motif_rejet: null, ouvert: false }
   }
 }

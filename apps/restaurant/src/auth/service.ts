@@ -10,6 +10,8 @@ export interface Restaurant {
   ville: string
   etat: EtatRestaurant
   motif_rejet: string | null
+  /** Interrupteur « ouvert / fermé » (US08) : un restaurant fermé ne reçoit plus de commande. */
+  ouvert: boolean
 }
 
 /** Compte connecté : un responsable et, s'il l'a inscrit, son restaurant. */
@@ -79,6 +81,9 @@ export interface ServiceRestaurant {
   creerRestaurant(restaurant: InfosRestaurant): Promise<void>
   categories(): Promise<Categorie[]>
   deconnecter(): Promise<void>
+
+  /** Ouvre ou ferme le restaurant aux commandes (réservé aux restaurants validés). */
+  changerOuverture(restaurantId: string, ouvert: boolean): Promise<void>
 
   /** Profil et horaires du restaurant du responsable connecté. */
   profilRestaurant(): Promise<ProfilEtHoraires>

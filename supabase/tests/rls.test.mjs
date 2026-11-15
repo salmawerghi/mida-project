@@ -537,3 +537,67 @@ test('US07 · un responsable bloqué ne modifie plus son restaurant', async () =
     await assert.rejects(requete(HORAIRES_7_JOURS(R_ZITOUNA)), RLS);
   }, `update public.profiles set etat_compte = 'bloque' where email = 'zitouna@mida.test'`);
 });
+
+// =====================================================================
+// US08 — ouvrir ou fermer son restaurant en un clic
+// =====================================================================
+const NOUVELLE_COMMANDE = (restaurant, etat = 'en_attente') => [
+  `insert into public.commandes (client_id, restaurant_id, adresse_livraison, etat, sous_total, frais_livraison, total)
+   values ($1, $2, '12, rue du Jasmin, La Marsa', '${etat}', 10, 2.5, 12.5)`, [ids.amine, restaurant]];
+
+test('US08 · un responsable ferme et rouvre son restaurant, les clients le voient', async () => {
+  await en('zitouna', async () => {
+    assert.equal(await nbModifiees(`update public.restaurants set ouvert = false where id = $1`, [R_ZITOUNA]), 1);
+    assert.equal(await nbModifiees(`update public.restaurants set ouvert = true where id = $1`, [R_ZITOUNA]), 1);
+    // pas l'interrupteur d'un autre restaurant
+    assert.equal(await nbModifiees(`update public.restaurants set ouvert = false where id = $1`, [R_KANOUN]), 0);
+  });
+  for (const lecteur of [null, 'amine']) {
+    await en(lecteur, async () => {
+      assert.deepEqual(await lignes(`select ouvert from public.restaurants where id = $1`, [R_ZITOUNA]), [{ ouvert: false }]);
+    }, `update public.restaurants set ouvert = false where id = '${R_ZITOUNA}'`);
+  }
+});
+
+test('US08 · seul un restaurant validé peut être ouvert', async () => {
+  await en('lellabeya', async () => {
+    await assert.rejects(lignes(`update public.restaurants set ouvert = true where responsable_id = auth.uid()`),
+                         /validé par Mida/);
+    // ses autres informations restent modifiables
+    assert.equal(await nbModifiees(`update public.restaurants set description = 'x' where responsable_id = auth.uid()`), 1);
+  });
+  // même une fonction serveur ne peut pas ouvrir un restaurant non validé : il reste fermé
+  await debut();
+  try {
+    await db.exec('set local role service_role');
+    await requete(`update public.restaurants set ouvert = true where nom = 'Lella Béya'`);
+    assert.deepEqual(await lignes(`select ouvert from public.restaurants where nom = 'Lella Béya'`), [{ ouvert: false }]);
+  } finally {
+    await fin();
+  }
+});
+
+test('US08 · bloquer un restaurant le ferme automatiquement', async () => {
+  await en('admin', async () => {
+    assert.equal(await nbModifiees(`update public.restaurants set etat = 'bloque' where id = $1`, [R_ZITOUNA]), 1);
+    assert.deepEqual(await lignes(`select etat::text, ouvert from public.restaurants where id = $1`, [R_ZITOUNA]),
+                     [{ etat: 'bloque', ouvert: false }]);
+  });
+});
+
+test('US08 · un restaurant fermé n\'accepte plus de nouvelle commande', async () => {
+  await debut();
+  try {
+    await db.exec('set local role service_role');           // comme la future fonction « passer commande »
+    await requete(...NOUVELLE_COMMANDE(R_ZITOUNA));           // ouvert : acceptée
+    await requete(`update public.restaurants set ouvert = false where id = $1`, [R_ZITOUNA]);
+    await assert.rejects(requete(...NOUVELLE_COMMANDE(R_ZITOUNA)), /restaurant est fermé/);
+    // un restaurant non validé non plus
+    const [{ id: beya }] = await lignes(`select id from public.restaurants where nom = 'Lella Béya'`);
+    await assert.rejects(requete(...NOUVELLE_COMMANDE(beya)), /restaurant est fermé/);
+    // les commandes déjà passées continuent leur vie après la fermeture
+    assert.equal(await nbModifiees(`update public.commandes set etat = 'acceptee', acceptee_le = now() where numero = 1045`), 1);
+  } finally {
+    await fin();
+  }
+});

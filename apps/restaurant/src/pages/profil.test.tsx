@@ -22,7 +22,7 @@ function ouvrir(chemin: string, service: FauxService) {
 const valide: Compte = {
   email: 'contact@darzitouna.tn',
   nom: 'Mehdi Ben Salem',
-  restaurant: { id: 'r1', nom: 'Dar Zitouna', ville: 'Tunis', etat: 'actif', motif_rejet: null },
+  restaurant: { id: 'r1', nom: 'Dar Zitouna', ville: 'Tunis', etat: 'actif', motif_rejet: null, ouvert: false },
 }
 const enAttente: Compte = { ...valide, restaurant: { ...valide.restaurant!, etat: 'en_attente' } }
 
@@ -110,8 +110,8 @@ describe('profil du restaurant', () => {
     expect(horaires).toHaveLength(7)
     expect(horaires[0]).toEqual({ jour: 1, ferme: false, ouverture: '12:00', fermeture: '15:00' })
     expect(horaires[6]).toMatchObject({ jour: 7, ferme: true })
-    // le nouveau nom est repris dans l'en-tête du profil
-    expect(screen.getByText('Dar Zitouna Marsa')).toBeInTheDocument()
+    // le nouveau nom est repris dans l'en-tête du profil et dans le menu
+    expect(await screen.findAllByText('Dar Zitouna Marsa')).toHaveLength(2)
   })
 
   it('informations invalides : messages sous les champs, rien n’est envoyé', async () => {

@@ -26,6 +26,7 @@ apps/
 | US03 | Stockage des images : 3 buckets (restaurants, avatars, documents-livreurs), seul le propriétaire envoie/remplace ses fichiers | fait, testé en local |
 | US04 | Appli client : inscription (nom, e-mail, téléphone +216, mot de passe), connexion, session conservée, déconnexion ; comptes non clients ou bloqués refusés | fait : 24 tests OK, essayé sur émulateur avec le vrai projet Supabase, puis installé sur un vrai téléphone (APK release) |
 | US05 | Espace restaurant web : inscription en 2 étapes (responsable puis restaurant), compte et restaurant « en attente » de validation, connexion, écran d'attente ou de refus (avec motif), pages réservées aux responsables connectés | fait : 27 tests Vitest + test PGlite, essayé avec le vrai projet Supabase |
+| US06 | Mot de passe oublié (appli client) : e-mail → code reçu par e-mail → nouveau mot de passe, puis session ouverte | codé, 13 tests OK ; **lien masqué** dans l'appli et essai réel en attente du réglage e-mail de Supabase (voir plus bas) |
 
 US01 à US03 sont appliquées sur le projet Supabase de Mida (`tpfpuwlgnxhwhezicuto`) ; le jeu de test n'y est pas encore chargé.
 
@@ -124,3 +125,15 @@ npm run build       # vérification TypeScript + version de production dans dist
 - Les comptes client, livreur, admin ou bloqués sont refusés avec un message qui indique la bonne application.
 - Reportés à US07 (profil du restaurant) : matricule fiscal et logo.
 - Essai du 15/11/2026 dans le navigateur avec le vrai projet Supabase : inscription d'un responsable et de son restaurant (Ariana), profil `responsable` / `en_attente`, restaurant `en_attente`, rôle présent dans le jeton (hook). « Confirm email » doit rester désactivé pendant les essais (sinon Supabase refuse les adresses `@mida.test`).
+
+## Mot de passe oublié (US06) — en attente du réglage e-mail
+
+Dans l'appli client : `lib/pages/mot_de_passe_oublie_page.dart` (`resetPasswordForEmail` → `verifyOTP` de type `recovery` → `updateUser`). Un code plutôt qu'un lien, pour ne pas dépendre de l'ouverture de l'appli depuis le navigateur.
+
+Le lien « Mot de passe oublié ? » de l'écran de connexion est **masqué** (`motDePasseOublieActif` dans `lib/config.dart`) tant que le projet Supabase n'envoie pas le code. À faire avant de l'activer :
+
+1. **SMTP personnalisé** (Authentication → Emails → Set up SMTP). Sans lui, l'offre gratuite ne permet pas de modifier les modèles d'e-mail, n'envoie qu'environ 2 e-mails par heure, et pas à toutes les adresses. Avec Gmail : hôte `smtp.gmail.com`, port `587`, identifiant = l'adresse Gmail, mot de passe = un « mot de passe d'application » Google (validation en deux étapes requise).
+2. **Modèle « Reset password »** (onglet Source) : y mettre le code `{{ .Token }}` à la place du lien.
+3. Lancer ou compiler avec `--dart-define=MOT_DE_PASSE_OUBLIE=true`, puis essayer avec une vraie adresse e-mail.
+
+La même fonction reste à faire dans l'espace restaurant web.

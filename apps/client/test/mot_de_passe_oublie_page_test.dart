@@ -15,7 +15,7 @@ Future<void> ouvrir(WidgetTester tester, FauxServiceAuth auth, {String email = '
   addTearDown(tester.view.reset);
   await tester.pumpWidget(MaterialApp(
     theme: construireTheme(policesGoogle: false),
-    home: ConnexionPage(auth: auth, emailInitial: email),
+    home: ConnexionPage(auth: auth, emailInitial: email, motDePasseOublie: true),
   ));
   final lien = find.text('Mot de passe oublié ?');
   await tester.scrollUntilVisible(lien, 200, scrollable: find.byType(Scrollable).first);
@@ -50,6 +50,14 @@ Future<void> saisir(WidgetTester tester, int index, String texte) async {
 }
 
 void main() {
+  testWidgets("lien masqué par défaut (tant que l'envoi du code n'est pas réglé sur Supabase)", (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      theme: construireTheme(policesGoogle: false),
+      home: ConnexionPage(auth: FauxServiceAuth()),
+    ));
+    expect(find.text('Mot de passe oublié ?'), findsNothing);
+  });
+
   testWidgets('l\'e-mail saisi à la connexion est repris', (tester) async {
     await ouvrir(tester, FauxServiceAuth(), email: 'salma@mida.test');
     expect(find.widgetWithText(TextFormField, 'salma@mida.test'), findsOneWidget);

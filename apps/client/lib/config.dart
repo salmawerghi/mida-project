@@ -15,3 +15,10 @@ const supabaseKey = String.fromEnvironment(
   'SUPABASE_KEY',
   defaultValue: 'sb_publishable_xxD9ZnF7RkGUTpX1tT1flA_iO0fa0pk',
 );
+
+/// Affiche le lien « Mot de passe oublié ? » (US06). Désactivé tant que le
+/// projet Supabase n'envoie pas le code par e-mail : il faut un SMTP
+/// personnalisé pour pouvoir mettre `{{ .Token }}` dans le modèle
+/// « Reset password » (voir le README). Pour l'activer :
+///   flutter run --dart-define=MOT_DE_PASSE_OUBLIE=true
+const motDePasseOublieActif = bool.fromEnvironment('MOT_DE_PASSE_OUBLIE');

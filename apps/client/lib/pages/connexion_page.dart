@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../auth/erreurs.dart';
 import '../auth/service_auth.dart';
 import '../auth/validation.dart';
+import '../config.dart';
 import '../theme.dart';
 import '../widgets/composants.dart';
 import 'inscription_page.dart';
@@ -11,12 +12,21 @@ import 'mot_de_passe_oublie_page.dart';
 
 /// Connexion par e-mail et mot de passe (maquette Client · Connexion).
 class ConnexionPage extends StatefulWidget {
-  const ConnexionPage({super.key, required this.auth, this.emailInitial, this.information});
+  const ConnexionPage({
+    super.key,
+    required this.auth,
+    this.emailInitial,
+    this.information,
+    this.motDePasseOublie = motDePasseOublieActif,
+  });
   final ServiceAuth auth;
   final String? emailInitial;
 
   /// Message affiché en haut du formulaire (ex. après l'inscription).
   final String? information;
+
+  /// Affiche le lien « Mot de passe oublié ? » (voir `motDePasseOublieActif`).
+  final bool motDePasseOublie;
 
   @override
   State<ConnexionPage> createState() => _ConnexionPageState();
@@ -149,15 +159,18 @@ class _ConnexionPageState extends State<ConnexionPage> {
                             ),
                           ),
                         ),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton(
-                            onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-                              builder: (_) => MotDePasseOubliePage(auth: widget.auth, emailInitial: _email.text),
-                            )),
-                            child: const Text('Mot de passe oublié ?'),
-                          ),
-                        ),
+                        if (widget.motDePasseOublie)
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                                builder: (_) => MotDePasseOubliePage(auth: widget.auth, emailInitial: _email.text),
+                              )),
+                              child: const Text('Mot de passe oublié ?'),
+                            ),
+                          )
+                        else
+                          const SizedBox(height: 8),
                         if (_erreur != null) ...[
                           MessageErreur(_erreur!),
                         ],

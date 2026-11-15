@@ -7,6 +7,7 @@ import '../auth/validation.dart';
 import '../theme.dart';
 import '../widgets/composants.dart';
 import 'inscription_page.dart';
+import 'mot_de_passe_oublie_page.dart';
 
 /// Connexion par e-mail et mot de passe (maquette Client · Connexion).
 class ConnexionPage extends StatefulWidget {
@@ -109,7 +110,7 @@ class _ConnexionPageState extends State<ConnexionPage> {
                         Text('Connexion', style: textes.headlineSmall),
                         if (widget.information != null) ...[
                           const SizedBox(height: 12),
-                          _Information(widget.information!),
+                          BandeauInformation(widget.information!),
                         ],
                         const SizedBox(height: 16),
                         ChampEtiquete(
@@ -148,11 +149,19 @@ class _ConnexionPageState extends State<ConnexionPage> {
                             ),
                           ),
                         ),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                              builder: (_) => MotDePasseOubliePage(auth: widget.auth, emailInitial: _email.text),
+                            )),
+                            child: const Text('Mot de passe oublié ?'),
+                          ),
+                        ),
                         if (_erreur != null) ...[
-                          const SizedBox(height: 8),
                           MessageErreur(_erreur!),
                         ],
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 16),
                         BoutonRelief(libelle: 'Se connecter', enCours: _enCours, onPressed: _seConnecter),
                         const SizedBox(height: 20),
                         Wrap(
@@ -176,33 +185,6 @@ class _ConnexionPageState extends State<ConnexionPage> {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _Information extends StatelessWidget {
-  const _Information(this.texte);
-  final String texte;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE6F4EC),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFB9DFC8)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(Icons.mark_email_read_outlined, color: Couleurs.succes),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(texte, style: const TextStyle(color: Color(0xFF1E5C3A), fontSize: 14, height: 1.4)),
-          ),
-        ],
       ),
     );
   }

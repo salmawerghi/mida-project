@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../auth/validation.dart';
 import '../theme.dart';
 
 /// Bouton « en relief » des maquettes : ombre pleine sous le bouton.
@@ -218,4 +219,69 @@ class _PeintreLogo extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// Jauge de solidité du mot de passe (4 barres et un conseil).
+class JaugeSolidite extends StatelessWidget {
+  const JaugeSolidite({super.key, required this.score});
+  final int score;
+
+  @override
+  Widget build(BuildContext context) {
+    final couleur = score >= 3 ? Couleurs.succes : (score == 2 ? Couleurs.dore : Couleurs.harissa);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ExcludeSemantics(
+          child: Row(
+            children: [
+              for (var i = 0; i < 4; i++) ...[
+                if (i > 0) const SizedBox(width: 6),
+                Expanded(
+                  child: Container(
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: i < score ? couleur : Couleurs.bordure,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(libelleSolidite(score),
+            style: TextStyle(fontSize: 13, color: score >= 3 ? const Color(0xFF1E5C3A) : Couleurs.texteDoux)),
+      ],
+    );
+  }
+}
+
+/// Bandeau vert d'information (e-mail envoyé, compte créé…).
+class BandeauInformation extends StatelessWidget {
+  const BandeauInformation(this.texte, {super.key});
+  final String texte;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE6F4EC),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFB9DFC8)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.mark_email_read_outlined, color: Couleurs.succes),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(texte, style: const TextStyle(color: Color(0xFF1E5C3A), fontSize: 14, height: 1.4)),
+          ),
+        ],
+      ),
+    );
+  }
 }

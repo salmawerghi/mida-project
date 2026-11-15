@@ -11,6 +11,7 @@ class ErreurMida implements Exception {
 }
 
 const messageIdentifiantsIncorrects = 'E-mail ou mot de passe incorrect.';
+const messageCodeInvalide = 'Code incorrect ou expiré. Vérifiez-le, ou demandez un nouveau code.';
 const messageHorsLigne = 'Pas de connexion internet. Vérifiez votre réseau puis réessayez.';
 
 /// Traduit une erreur de Supabase Auth (ou du réseau) en message clair.
@@ -40,6 +41,15 @@ String messageErreur(Object erreur) {
     }
     if (code.startsWith('over_') || erreur.statusCode == '429') {
       return 'Trop de tentatives. Patientez quelques minutes puis réessayez.';
+    }
+    if (code == 'otp_expired' || code == 'otp_disabled' || message.contains('token has expired or is invalid')) {
+      return messageCodeInvalide;
+    }
+    if (code == 'same_password') {
+      return 'Le nouveau mot de passe doit être différent de l\'ancien.';
+    }
+    if (code == 'email_address_not_authorized') {
+      return 'Impossible d\'envoyer un e-mail à cette adresse pour le moment. Contactez le support Mida.';
     }
     if (code == 'signup_disabled') {
       return 'Les inscriptions sont momentanément fermées.';

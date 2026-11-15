@@ -174,7 +174,7 @@ class _InscriptionPageState extends State<InscriptionPage> {
                 ),
                 if (_motDePasse.text.isNotEmpty) ...[
                   const SizedBox(height: 8),
-                  _JaugeSolidite(score: solidite),
+                  JaugeSolidite(score: solidite),
                 ],
                 const SizedBox(height: 16),
                 InkWell(
@@ -236,42 +236,6 @@ class _InscriptionPageState extends State<InscriptionPage> {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _JaugeSolidite extends StatelessWidget {
-  const _JaugeSolidite({required this.score});
-  final int score;
-
-  @override
-  Widget build(BuildContext context) {
-    final couleur = score >= 3 ? Couleurs.succes : (score == 2 ? Couleurs.dore : Couleurs.harissa);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ExcludeSemantics(
-          child: Row(
-            children: [
-              for (var i = 0; i < 4; i++) ...[
-                if (i > 0) const SizedBox(width: 6),
-                Expanded(
-                  child: Container(
-                    height: 6,
-                    decoration: BoxDecoration(
-                      color: i < score ? couleur : Couleurs.bordure,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(libelleSolidite(score),
-            style: TextStyle(fontSize: 13, color: score >= 3 ? const Color(0xFF1E5C3A) : Couleurs.texteDoux)),
-      ],
     );
   }
 }

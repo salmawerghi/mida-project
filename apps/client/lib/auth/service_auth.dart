@@ -26,6 +26,17 @@ abstract class ServiceAuth {
   });
   Future<void> connecter({required String email, required String motDePasse});
   Future<void> deconnecter();
+
+  /// Envoie le code de réinitialisation à [email]. Ne dit jamais si un compte
+  /// existe pour cette adresse (Supabase répond pareil dans les deux cas).
+  Future<void> demanderReinitialisation(String email);
+
+  /// Vérifie le code reçu par e-mail : ouvre une session de récupération.
+  /// Lève `ErreurMida` (et déconnecte) si le compte n'est pas un compte client.
+  Future<void> verifierCodeReinitialisation({required String email, required String code});
+
+  /// Enregistre le nouveau mot de passe (session de récupération ouverte).
+  Future<void> changerMotDePasse(String nouveauMotDePasse);
 }
 
 class ServiceAuthSupabase implements ServiceAuth {
@@ -82,6 +93,26 @@ class ServiceAuthSupabase implements ServiceAuth {
 
   @override
   Future<void> deconnecter() => _auth.signOut();
+
+  @override
+  Future<void> demanderReinitialisation(String email) => _auth.resetPasswordForEmail(email.trim());
+
+  @override
+  Future<void> verifierCodeReinitialisation({required String email, required String code}) async {
+    final reponse = await _auth.verifyOTP(
+      type: OtpType.recovery,
+      email: email.trim(),
+      token: code.replaceAll(' ', ''),
+    );
+    final session = reponse.session;
+    if (session == null) throw const ErreurMida(messageCodeInvalide);
+    await _verifierCompteClient(session);
+  }
+
+  @override
+  Future<void> changerMotDePasse(String nouveauMotDePasse) async {
+    await _auth.updateUser(UserAttributes(password: nouveauMotDePasse));
+  }
 
   /// Cette application est réservée aux clients : un compte livreur,
   /// restaurant ou admin, ou un compte bloqué, est déconnecté aussitôt.

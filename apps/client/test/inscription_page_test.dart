@@ -6,37 +6,7 @@ import 'package:mida_client/pages/inscription_page.dart';
 import 'package:mida_client/theme.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Faux service : enregistre les appels et renvoie le résultat prévu.
-class FauxServiceAuth implements ServiceAuth {
-  FauxServiceAuth({this.resultat = ResultatInscription.confirmationEmail, this.erreur});
-  final ResultatInscription resultat;
-  final Object? erreur;
-  final appels = <Map<String, String>>[];
-
-  @override
-  Session? get session => null;
-  @override
-  Stream<AuthState> get changements => const Stream.empty();
-  @override
-  String get nomAffiche => '';
-
-  @override
-  Future<ResultatInscription> inscrire({
-    required String nom,
-    required String email,
-    required String telephone,
-    required String motDePasse,
-  }) async {
-    appels.add({'nom': nom, 'email': email, 'telephone': telephone, 'motDePasse': motDePasse});
-    if (erreur != null) throw erreur!;
-    return resultat;
-  }
-
-  @override
-  Future<void> connecter({required String email, required String motDePasse}) async {}
-  @override
-  Future<void> deconnecter() async {}
-}
+import 'faux_service_auth.dart';
 
 Future<void> ouvrir(WidgetTester tester, FauxServiceAuth auth) async {
   tester.view.physicalSize = const Size(1080, 2400);

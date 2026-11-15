@@ -67,4 +67,20 @@ void main() {
       expect(libelleSolidite(4), 'Mot de passe très solide');
     });
   });
+
+  group('réinitialisation (US06)', () {
+    test('code : 6 chiffres attendus', () {
+      expect(validerCode(''), 'Indiquez le code reçu par e-mail.');
+      expect(validerCode('12345'), 'Le code comporte 6 chiffres.');
+      expect(validerCode('12a456'), 'Le code comporte 6 chiffres.');
+      expect(validerCode('123456'), isNull);
+      expect(validerCode('123 456'), isNull);
+      expect(validerCode('12345678'), isNull); // projet réglé sur 8 chiffres
+    });
+    test('confirmation identique au mot de passe', () {
+      expect(validerConfirmation('', 'Mida2026!'), 'Confirmez le nouveau mot de passe.');
+      expect(validerConfirmation('Mida2025!', 'Mida2026!'), contains('pas identiques'));
+      expect(validerConfirmation('Mida2026!', 'Mida2026!'), isNull);
+    });
+  });
 }

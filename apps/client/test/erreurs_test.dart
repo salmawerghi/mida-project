@@ -63,4 +63,18 @@ void main() {
       expect(refusCompte('client', 'bloque'), contains('suspendu'));
     });
   });
+
+  group('erreurs de réinitialisation (US06)', () {
+    test('code expiré ou faux', () {
+      expect(messageErreur(const AuthApiException('x', code: 'otp_expired')), messageCodeInvalide);
+      expect(messageErreur(const AuthApiException('Token has expired or is invalid')), messageCodeInvalide);
+    });
+    test("même mot de passe que l'ancien", () {
+      expect(messageErreur(const AuthApiException('x', code: 'same_password')), contains("différent de l'ancien"));
+    });
+    test("envoi d'e-mail trop fréquent ou refusé", () {
+      expect(messageErreur(const AuthApiException('x', code: 'over_email_send_rate_limit')), contains('Trop de tentatives'));
+      expect(messageErreur(const AuthApiException('x', code: 'email_address_not_authorized')), contains('support'));
+    });
+  });
 }

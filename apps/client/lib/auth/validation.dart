@@ -43,6 +43,21 @@ String? validerMotDePasseInscription(String? v) {
 String? validerMotDePasseConnexion(String? v) =>
     (v == null || v.isEmpty) ? 'Indiquez votre mot de passe.' : null;
 
+/// Code de réinitialisation reçu par e-mail : 6 chiffres (jusqu'à 10 si le
+/// projet Supabase est réglé ainsi).
+String? validerCode(String? v) {
+  final t = (v ?? '').replaceAll(' ', '');
+  if (t.isEmpty) return 'Indiquez le code reçu par e-mail.';
+  if (!RegExp(r'^\d{6,10}$').hasMatch(t)) return 'Le code comporte 6 chiffres.';
+  return null;
+}
+
+String? validerConfirmation(String? v, String motDePasse) {
+  if (v == null || v.isEmpty) return 'Confirmez le nouveau mot de passe.';
+  if (v != motDePasse) return 'Les deux mots de passe ne sont pas identiques.';
+  return null;
+}
+
 /// Solidité du mot de passe, de 0 à 4 (les 4 barres sous le champ).
 int soliditeMotDePasse(String mdp) {
   if (mdp.isEmpty) return 0;

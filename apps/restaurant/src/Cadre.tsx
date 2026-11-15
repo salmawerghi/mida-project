@@ -9,7 +9,7 @@ import { Logo } from './composants'
 /**
  * Cadre des pages de l'espace restaurant (maquettes « Restaurant · … ») :
  * menu latéral bleu et contenu à droite. Les autres rubriques (commandes,
- * menu, historique, statistiques) s'ajouteront avec leurs stories.
+ * historique, statistiques) s'ajouteront avec leurs stories.
  */
 export default function Cadre({ compte, children }: { compte: Compte; children: ReactNode }) {
   const { service } = useSession()
@@ -28,6 +28,9 @@ export default function Cadre({ compte, children }: { compte: Compte; children: 
         <nav aria-label="Navigation principale" className="cadre-liens">
           <NavLink to={accueil} className={classeLien}>
             {accueil === '/tableau' ? 'Tableau de bord' : 'Ma demande'}
+          </NavLink>
+          <NavLink to="/menu" className={classeLien}>
+            Menu
           </NavLink>
           <NavLink to="/profil" className={classeLien}>
             Profil du restaurant

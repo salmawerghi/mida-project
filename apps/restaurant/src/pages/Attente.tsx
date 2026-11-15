@@ -42,13 +42,16 @@ export default function Attente({ compte }: { compte: Compte }) {
               </p>
               <p className="message message-note">
                 Votre restaurant restera invisible des clients jusqu'à la validation. En attendant, ajoutez votre logo
-                et vos horaires d'ouverture dans le profil du restaurant.
+                et vos horaires dans le profil du restaurant, et préparez votre menu.
               </p>
             </>
           )}
           <div className="actions" style={{ justifyContent: 'flex-start', marginTop: 6 }}>
             <Link to="/profil" className="bouton bouton-bleu">
               Profil du restaurant
+            </Link>
+            <Link to="/menu" className="bouton bouton-blanc">
+              Menu
             </Link>
             <Bouton variante="blanc" onClick={() => void service.deconnecter()}>
               Se déconnecter

@@ -601,3 +601,100 @@ test('US08 · un restaurant fermé n\'accepte plus de nouvelle commande', async 
     await fin();
   }
 });
+
+// =====================================================================
+// US09 — catégories du menu
+// =====================================================================
+const M_Z_COUSCOUS = '30000000-0000-4000-8000-000000000001';   // Dar Zitouna, contient des plats
+const M_K_OJJA = '30000000-0000-4000-8000-000000000005';       // El Kanoun
+const categoriesDe = async (restaurant) =>
+  (await lignes(`select nom from public.categories_menu where restaurant_id = $1 order by ordre, nom`, [restaurant])).map((c) => c.nom);
+
+test('US09 · un responsable crée, renomme et ordonne les catégories de son menu', async () => {
+  await en('zitouna', async () => {
+    const avant = await categoriesDe(R_ZITOUNA);
+    await requete(`insert into public.categories_menu (restaurant_id, nom, ordre) values ($1, 'Boissons', 99)`, [R_ZITOUNA]);
+    assert.deepEqual(await categoriesDe(R_ZITOUNA), [...avant, 'Boissons']);
+    // deux catégories du même menu ne portent pas le même nom
+    await assert.rejects(requete(`insert into public.categories_menu (restaurant_id, nom) values ($1, 'Boissons')`, [R_ZITOUNA]),
+                         /unique|duplicate/i);
+    assert.equal(await nbModifiees(`update public.categories_menu set nom = 'Boissons fraîches'
+                                    where restaurant_id = $1 and nom = 'Boissons'`, [R_ZITOUNA]), 1);
+    // nouvel ordre enregistré d'un coup (ce que fait l'espace restaurant) : « Boissons fraîches » en premier
+    await requete(`insert into public.categories_menu (id, restaurant_id, nom, ordre)
+                   select id, restaurant_id, nom, case when nom = 'Boissons fraîches' then 0 else ordre end
+                   from public.categories_menu where restaurant_id = $1
+                   on conflict (id) do update set ordre = excluded.ordre`, [R_ZITOUNA]);
+    assert.deepEqual(await categoriesDe(R_ZITOUNA), ['Boissons fraîches', ...avant]);
+  });
+});
+
+test('US09 · supprimer une catégorie : vide directement, avec ses plats par la fonction dédiée', async () => {
+  await en('zitouna', async () => {
+    // catégorie vide : suppression simple
+    await requete(`insert into public.categories_menu (restaurant_id, nom) values ($1, 'Vide')`, [R_ZITOUNA]);
+    assert.equal(await nbModifiees(`delete from public.categories_menu where restaurant_id = $1 and nom = 'Vide'`, [R_ZITOUNA]), 1);
+    // catégorie avec des plats : la suppression simple est refusée…
+    const [{ n: plats }] = await lignes(`select count(*)::int as n from public.plats where categorie_id = $1`, [M_Z_COUSCOUS]);
+    assert.ok(plats > 0);
+    await assert.rejects(lignes(`delete from public.categories_menu where id = $1`, [M_Z_COUSCOUS]), /foreign key/i);
+    // … la fonction (appelée après confirmation) supprime les plats puis la catégorie
+    const [{ supprimes }] = await lignes(`select public.supprimer_categorie_menu($1) as supprimes`, [M_Z_COUSCOUS]);
+    assert.equal(supprimes, plats);
+    assert.deepEqual(await lignes(`select id from public.categories_menu where id = $1`, [M_Z_COUSCOUS]), []);
+    assert.deepEqual(await lignes(`select id from public.plats where categorie_id = $1`, [M_Z_COUSCOUS]), []);
+  });
+  // les commandes déjà passées gardent le nom et le prix des plats supprimés
+  await debut();
+  try {
+    const [{ n: avant }] = await lignes(`select count(*)::int as n from public.lignes_commande`);
+    await db.query("select set_config('request.jwt.claim.sub', $1, true)", [ids.zitouna]);
+    await db.exec('set local role authenticated');
+    await requete(`select public.supprimer_categorie_menu($1)`, [M_Z_COUSCOUS]);
+    await db.exec('reset role');
+    const [{ n: apres, sans_plat }] = await lignes(`select count(*)::int as n, count(*) filter (where plat_id is null)::int as sans_plat
+                                                    from public.lignes_commande`);
+    assert.equal(apres, avant);
+    assert.ok(sans_plat > 0);
+  } finally {
+    await fin();
+  }
+});
+
+test('US09 · personne ne touche aux catégories d\'un autre restaurant', async () => {
+  for (const intrus of ['zitouna', 'amine']) {
+    await en(intrus, async () => {
+      await assert.rejects(requete(`insert into public.categories_menu (restaurant_id, nom) values ($1, 'Pirate')`, [R_KANOUN]), RLS);
+      assert.equal(await nbModifiees(`update public.categories_menu set nom = 'Pirate' where id = $1`, [M_K_OJJA]), 0);
+      assert.equal(await nbModifiees(`delete from public.categories_menu where id = $1`, [M_K_OJJA]), 0);
+      await assert.rejects(lignes(`select public.supprimer_categorie_menu($1)`, [M_K_OJJA]), /pas le droit/);
+    });
+  }
+  // un visiteur ne peut pas appeler la fonction
+  await en(null, async () => {
+    await assert.rejects(lignes(`select public.supprimer_categorie_menu($1)`, [M_K_OJJA]), /permission denied/);
+  });
+  // rien n'a été supprimé
+  const [{ n }] = await lignes(`select count(*)::int as n from public.categories_menu where id = $1`, [M_K_OJJA]);
+  assert.equal(n, 1);
+});
+
+test('US09 · le menu est lu dans l\'ordre choisi ; celui d\'un restaurant en attente reste privé', async () => {
+  for (const lecteur of [null, 'amine']) {
+    await en(lecteur, async () => {
+      assert.deepEqual((await categoriesDe(R_ZITOUNA))[0], 'Nouveautés');
+      assert.deepEqual(await lignes(`select c.id from public.categories_menu c
+                                     join public.restaurants r on r.id = c.restaurant_id where r.nom = 'Lella Béya'`), []);
+    }, `insert into public.categories_menu (restaurant_id, nom, ordre) values ('${R_ZITOUNA}', 'Nouveautés', -1);
+        insert into public.categories_menu (restaurant_id, nom)
+        select id, 'En préparation' from public.restaurants where nom = 'Lella Béya';`);
+  }
+  // le responsable en attente prépare déjà son menu
+  await en('lellabeya', async () => {
+    await requete(`insert into public.categories_menu (restaurant_id, nom)
+                   select id, 'Poissons du jour' from public.restaurants where responsable_id = auth.uid()`);
+    const [{ n }] = await lignes(`select count(*)::int as n from public.categories_menu c
+                                  join public.restaurants r on r.id = c.restaurant_id where r.responsable_id = auth.uid()`);
+    assert.ok(n >= 1);
+  });
+});

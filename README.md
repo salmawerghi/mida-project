@@ -11,6 +11,7 @@ supabase/
     20261113000002_roles_securite.sql  US02 : rôles, règles d'accès (RLS), rôle dans le jeton
     20261113000003_stockage_images.sql US03 : stockage des images (buckets + règles d'accès)
     20261115000001_ouverture_restaurant.sql US08 : ouvert / fermé, pas de commande pour un restaurant fermé
+    20261115000002_suppression_categorie_menu.sql US09 : suppression d'une catégorie avec ses plats
   seed.sql                             jeu de données de test (données des maquettes)
   tests/                               tests automatiques des migrations (PGlite, sans Docker)
 apps/
@@ -30,8 +31,9 @@ apps/
 | US06 | Mot de passe oublié (appli client) : e-mail → code reçu par e-mail → nouveau mot de passe, puis session ouverte | codé, 13 tests OK ; **lien masqué** dans l'appli et essai réel en attente du réglage e-mail de Supabase (voir plus bas) |
 | US07 | Profil du restaurant (espace web) : nom, catégorie, adresse, ville, téléphone, description, logo et horaires des 7 jours ; ouvert dès l'inscription, même avant la validation | codé : 21 tests Vitest + 5 tests PGlite ; essai réel à faire |
 | US08 | Ouvrir ou fermer son restaurant en un clic (interrupteur du menu de l'espace web) ; un restaurant fermé ou non validé ne reçoit plus de nouvelle commande | codé : 4 tests Vitest + 4 tests PGlite, migration appliquée sur Supabase ; essai réel à faire (il faut un restaurant validé) ; affichage côté client avec le catalogue |
+| US09 | Catégories du menu (espace web, page « Menu ») : créer, renommer, ordonner ; suppression avec confirmation, qui annonce et supprime les plats de la catégorie | codé : 16 tests Vitest + 4 tests PGlite, fonction appliquée sur Supabase ; essai réel à faire |
 
-US01 à US03 et US08 sont appliquées sur le projet Supabase de Mida (`tpfpuwlgnxhwhezicuto`) ; le jeu de test n'y est pas encore chargé.
+US01 à US03, US08 et US09 sont appliquées sur le projet Supabase de Mida (`tpfpuwlgnxhwhezicuto`) ; le jeu de test n'y est pas encore chargé.
 
 ## Appliquer sur un projet Supabase
 
@@ -43,7 +45,8 @@ Méthode simple, depuis le tableau de bord Supabase (**SQL Editor**), dans cet o
 2. `supabase/migrations/20261113000002_roles_securite.sql`
 3. `supabase/migrations/20261113000003_stockage_images.sql`
 4. `supabase/migrations/20261115000001_ouverture_restaurant.sql`
-5. `supabase/seed.sql` (données de test, facultatif)
+5. `supabase/migrations/20261115000002_suppression_categorie_menu.sql`
+6. `supabase/seed.sql` (données de test, facultatif)
 
 Puis activer le rôle dans le jeton : **Authentication → Hooks → Custom Access Token** → `public.custom_access_token_hook`.
 
@@ -120,7 +123,7 @@ flutter run         # se connecte au projet Supabase de Mida (lib/config.dart)
 cd apps/restaurant
 npm install
 npm run dev         # http://localhost:5173 — se connecte au projet Supabase de Mida (src/config.ts)
-npm test            # 52 tests (Vitest)
+npm test            # 68 tests (Vitest)
 npm run build       # vérification TypeScript + version de production dans dist/
 ```
 
@@ -149,6 +152,13 @@ Page `/profil` (`src/pages/Profil.tsx`), dans le cadre à menu latéral (`src/Ca
   - un restaurant ouvert est forcément validé (contrainte) ; le responsable d'un restaurant en attente reçoit un refus, et bloquer ou refuser un restaurant le ferme automatiquement ;
   - **aucune nouvelle commande** (état `en_attente`) ne peut être créée pour un restaurant fermé ou non validé, même par une fonction serveur (déclencheur `restaurant_ouvert` sur `commandes`). Les commandes déjà passées continuent leur vie après la fermeture. La future fonction « passer commande » devra afficher ce refus au client.
 - L'interrupteur est manuel : il ne suit pas les horaires d'ouverture (US07).
+
+### Catégories du menu (US09)
+
+- Page `/menu` (`src/pages/Menu.tsx`, lien « Menu » du menu latéral), ouverte dès l'inscription du restaurant : le menu se prépare pendant la validation, mais reste invisible des clients jusque-là.
+- Une catégorie a un **nom** (40 caractères au plus, unique dans le menu, sans tenir compte des majuscules) et un **ordre d'affichage**. Une nouvelle catégorie va à la fin ; les flèches la montent ou la descendent, et l'ordre complet est enregistré en une seule requête (`upsert`, `ordre` = 1, 2, 3…).
+- **Suppression** : toujours confirmée. Si la catégorie contient des plats, la confirmation l'annonce (« contient 3 plats… ces plats seront supprimés ») et le bouton le répète. La base refuse de supprimer directement une catégorie qui contient des plats ; l'espace restaurant appelle donc la fonction `supprimer_categorie_menu` (migration `20261115000002`), qui supprime les plats puis la catégorie dans la même transaction, avec les droits de l'appelant. Les commandes déjà passées gardent le nom et le prix des plats supprimés.
+- Les plats eux-mêmes (nom, prix, photo) : US10.
 
 ## Mot de passe oublié (US06) — en attente du réglage e-mail
 

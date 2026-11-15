@@ -21,7 +21,10 @@ export default function Tableau({ compte }: { compte: Compte }) {
           </p>
         )}
         <div className="actions" style={{ justifyContent: 'flex-start' }}>
-          <Link to="/profil" className="bouton bouton-bleu">
+          <Link to="/menu" className="bouton bouton-bleu">
+            Votre menu
+          </Link>
+          <Link to="/profil" className="bouton bouton-blanc">
             Profil du restaurant
           </Link>
         </div>

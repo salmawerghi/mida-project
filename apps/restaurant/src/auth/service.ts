@@ -1,5 +1,6 @@
 /** Opérations de compte utilisées par les écrans (remplaçables dans les tests). */
 
+import type { CategorieMenu } from '../menu/categories'
 import type { Horaire } from '../profil/horaires'
 
 export type EtatRestaurant = 'en_attente' | 'actif' | 'rejete' | 'bloque'
@@ -91,6 +92,15 @@ export interface ServiceRestaurant {
   enregistrerProfil(restaurantId: string, infos: InfosRestaurant, horaires: Horaire[]): Promise<void>
   /** Envoie le nouveau logo et renvoie son adresse publique. */
   changerLogo(restaurantId: string, fichier: File): Promise<string>
+
+  /** Catégories du menu, dans l'ordre d'affichage, avec leur nombre de plats (US09). */
+  categoriesMenu(restaurantId: string): Promise<CategorieMenu[]>
+  creerCategorieMenu(restaurantId: string, nom: string, ordre: number): Promise<void>
+  renommerCategorieMenu(categorieId: string, nom: string): Promise<void>
+  /** Enregistre l'ordre d'affichage : `categories` est la liste complète, dans le nouvel ordre. */
+  ordonnerCategoriesMenu(restaurantId: string, categories: CategorieMenu[]): Promise<void>
+  /** Supprime la catégorie et tous ses plats. */
+  supprimerCategorieMenu(categorieId: string): Promise<void>
 }
 
 /** Seuls les comptes « responsable » non bloqués utilisent l'espace restaurant. */

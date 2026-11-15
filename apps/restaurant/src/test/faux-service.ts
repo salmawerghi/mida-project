@@ -9,6 +9,7 @@ import type {
   ResultatInscription,
   ServiceRestaurant,
 } from '../auth/service'
+import type { CategorieMenu } from '../menu/categories'
 import { horairesParDefaut, type Horaire } from '../profil/horaires'
 
 /** Faux service : garde le compte en mémoire et enregistre les appels. */
@@ -38,6 +39,37 @@ export class FauxService implements ServiceRestaurant {
   deconnecter = vi.fn(async () => {
     this.compte = null
     this.prevenir()
+  })
+
+  /** Menu gardé en mémoire (US09). */
+  menu: CategorieMenu[] = [
+    { id: 'c1', nom: 'Couscous', ordre: 1, nbPlats: 3 },
+    { id: 'c2', nom: 'Tajines', ordre: 2, nbPlats: 0 },
+    { id: 'c3', nom: 'Douceurs et thé', ordre: 3, nbPlats: 1 },
+  ]
+  erreurMenu: unknown = null
+  private prochainId = 10
+
+  categoriesMenu = vi.fn(async (_restaurant: string) => [...this.menu].sort((a, b) => a.ordre - b.ordre))
+
+  creerCategorieMenu = vi.fn(async (_restaurant: string, nom: string, ordre: number) => {
+    if (this.erreurMenu) throw this.erreurMenu
+    this.menu = [...this.menu, { id: `c${this.prochainId++}`, nom: nom.trim(), ordre, nbPlats: 0 }]
+  })
+
+  renommerCategorieMenu = vi.fn(async (id: string, nom: string) => {
+    if (this.erreurMenu) throw this.erreurMenu
+    this.menu = this.menu.map((c) => (c.id === id ? { ...c, nom: nom.trim() } : c))
+  })
+
+  ordonnerCategoriesMenu = vi.fn(async (_restaurant: string, categories: CategorieMenu[]) => {
+    if (this.erreurMenu) throw this.erreurMenu
+    this.menu = categories.map((c, i) => ({ ...c, ordre: i + 1 }))
+  })
+
+  supprimerCategorieMenu = vi.fn(async (id: string) => {
+    if (this.erreurMenu) throw this.erreurMenu
+    this.menu = this.menu.filter((c) => c.id !== id)
   })
 
   erreurOuverture: unknown = null

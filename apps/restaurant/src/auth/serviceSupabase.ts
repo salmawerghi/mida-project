@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 import { supabaseKey, supabaseUrl } from '../config'
+import { messageCategorieExistante, type CategorieMenu } from '../menu/categories'
 import { completerHoraires, heureCourte, type Horaire } from '../profil/horaires'
 import { reduireImage } from '../profil/image'
 import { effacerBrouillon, sauverBrouillon } from './brouillon'
@@ -253,4 +254,57 @@ export class ServiceRestaurantSupabase implements ServiceRestaurant {
     if (!data?.length) throw new ErreurMida(messageModificationRefusee)
     return url
   }
+
+  async categoriesMenu(restaurantId: string): Promise<CategorieMenu[]> {
+    const { data, error } = await this.client
+      .from('categories_menu')
+      .select('id, nom, ordre, plats(count)')
+      .eq('restaurant_id', restaurantId)
+      .order('ordre')
+      .order('nom')
+    if (error) throw error
+    return (data ?? []).map((c) => ({
+      id: c.id,
+      nom: c.nom,
+      ordre: c.ordre,
+      nbPlats: (c.plats as { count: number }[] | null)?.[0]?.count ?? 0,
+    }))
+  }
+
+  async creerCategorieMenu(restaurantId: string, nom: string, ordre: number): Promise<void> {
+    const { error } = await this.client.from('categories_menu').insert({ restaurant_id: restaurantId, nom: nom.trim(), ordre })
+    if (error) throw erreurCategorie(error)
+  }
+
+  async renommerCategorieMenu(categorieId: string, nom: string): Promise<void> {
+    const { data, error } = await this.client
+      .from('categories_menu')
+      .update({ nom: nom.trim() })
+      .eq('id', categorieId)
+      .select('id')
+    if (error) throw erreurCategorie(error)
+    if (!data?.length) throw new ErreurMida(messageMenuRefuse)
+  }
+
+  async ordonnerCategoriesMenu(restaurantId: string, categories: CategorieMenu[]): Promise<void> {
+    // Une seule requête pour tout le menu : l'ordre est enregistré en entier, ou pas du tout.
+    const { error } = await this.client.from('categories_menu').upsert(
+      categories.map((c, i) => ({ id: c.id, restaurant_id: restaurantId, nom: c.nom, ordre: i + 1 })),
+      { onConflict: 'id' },
+    )
+    if (error) throw error
+  }
+
+  async supprimerCategorieMenu(categorieId: string): Promise<void> {
+    // Fonction de la base (migration US09) : supprime les plats puis la catégorie, dans la même transaction.
+    const { error } = await this.client.rpc('supprimer_categorie_menu', { p_categorie: categorieId })
+    if (error) throw error
+  }
+}
+
+const messageMenuRefuse = "Ce compte n'a pas le droit de modifier ce menu."
+
+/** Deux catégories d'un même menu ne peuvent pas porter le même nom (contrainte de la base). */
+function erreurCategorie(erreur: { code?: string }): unknown {
+  return erreur.code === '23505' ? new ErreurMida(messageCategorieExistante) : erreur
 }

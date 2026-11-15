@@ -566,3 +566,206 @@ textarea.saisie {
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
+
+/* ---------- Cadre de l'espace restaurant (menu latéral) ---------- */
+.cadre {
+  min-height: 100vh;
+  display: flex;
+  flex-wrap: wrap;
+}
+.cadre-menu {
+  flex: 1 1 232px;
+  max-width: 100%;
+  background-color: var(--bleu);
+  color: #fff;
+  padding: 28px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.cadre-sous-titre {
+  font-size: 13px;
+  color: var(--bleu-clair);
+}
+.cadre-liens {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cadre-lien,
+.cadre-lien:hover {
+  text-decoration: none;
+  color: #fff;
+  font-weight: 500;
+  font-size: 15px;
+  padding: 12px 14px;
+  border-radius: 14px;
+}
+.cadre-lien:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+.cadre-lien-actif,
+.cadre-lien-actif:hover {
+  color: var(--bleu-fonce);
+  background: #fff;
+  font-weight: 600;
+  box-shadow: 0 4px 0 var(--bleu-fonce);
+}
+.cadre-compte {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--bleu-clair);
+  overflow-wrap: anywhere;
+}
+.bouton-petit {
+  min-height: 44px;
+  padding: 8px 16px;
+  font-size: 14px;
+  border-radius: 14px;
+}
+.cadre-contenu {
+  flex: 999 1 560px;
+  min-width: 0;
+  padding: 28px 32px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.cadre-contenu .chargement {
+  min-height: 50vh;
+}
+.cadre-contenu h1 {
+  font-size: 32px;
+}
+
+/* ---------- Profil du restaurant (US07) ---------- */
+.profil {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.profil-colonnes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 22px;
+  align-items: flex-start;
+}
+.profil-carte {
+  flex: 1 1 380px;
+  min-width: 0;
+  padding: 24px;
+  border-radius: 24px;
+  box-shadow: 0 5px 0 var(--bordure);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.profil-carte h2 {
+  font-size: 22px;
+}
+.profil-entete {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.profil-logo {
+  flex: none;
+  width: 92px;
+  height: 92px;
+  border-radius: 28px;
+  background: var(--bleu);
+  box-shadow: 0 5px 0 var(--bleu-fonce);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: #fff;
+  font: 700 40px var(--titre);
+}
+.profil-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.profil-identite {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.profil-nom {
+  font: 700 22px var(--titre);
+  overflow-wrap: anywhere;
+}
+.lien-fichier {
+  align-self: flex-start;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--bleu);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: 8px;
+}
+.lien-fichier:hover {
+  color: var(--bleu-fonce);
+}
+.lien-fichier:focus-within {
+  outline: 3px solid var(--dore);
+  outline-offset: 2px;
+}
+.horaire {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 6px 0;
+  border-bottom: 1px solid #edf1f8;
+}
+.horaire-jour {
+  width: 140px;
+  font-weight: 600;
+  font-size: 15px;
+}
+.horaire-jour input {
+  width: 22px;
+  height: 22px;
+}
+.horaire .pastille {
+  align-self: center;
+}
+.horaire-heures {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 15px;
+}
+.saisie.saisie-heure {
+  width: auto;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 12px;
+  background: var(--fond);
+  font-weight: 600;
+}
+.horaire-note {
+  font-size: 13px;
+  color: var(--texte-doux);
+}
+.horaire .erreur-champ {
+  flex-basis: 100%;
+}
+@media (max-width: 560px) {
+  .cadre-contenu {
+    padding: 22px 16px 32px;
+  }
+  .profil-carte {
+    padding: 20px 16px;
+  }
+}

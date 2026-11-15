@@ -1,3 +1,5 @@
+import { Link } from 'react-router'
+
 import tajine from '../assets/illustrations/tajine.svg'
 import type { Compte } from '../auth/service'
 import { useSession } from '../auth/session'
@@ -39,12 +41,15 @@ export default function Attente({ compte }: { compte: Compte }) {
                 {compte.email} dès la validation, en général sous 48 heures.
               </p>
               <p className="message message-note">
-                Votre restaurant restera invisible des clients jusqu'à la validation. La préparation du menu arrive dans
-                une prochaine version de l'espace restaurant.
+                Votre restaurant restera invisible des clients jusqu'à la validation. En attendant, ajoutez votre logo
+                et vos horaires d'ouverture dans le profil du restaurant.
               </p>
             </>
           )}
           <div className="actions" style={{ justifyContent: 'flex-start', marginTop: 6 }}>
+            <Link to="/profil" className="bouton bouton-bleu">
+              Profil du restaurant
+            </Link>
             <Bouton variante="blanc" onClick={() => void service.deconnecter()}>
               Se déconnecter
             </Bouton>

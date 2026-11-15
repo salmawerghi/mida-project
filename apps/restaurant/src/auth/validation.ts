@@ -34,6 +34,11 @@ export function formaterTelephone(saisie: string): string {
   return `+216 ${c.slice(0, 2)} ${c.slice(2, 5)} ${c.slice(5)}`
 }
 
+/** « +216 71 744 210 » (base) → « 71 744 210 » (champ de saisie, indicatif affiché devant). */
+export function telephoneSaisi(enregistre: string | null | undefined): string {
+  return (enregistre ?? '').replace(/^\s*\+216\s*/, '')
+}
+
 export function validerMotDePasseInscription(v: string): string | null {
   if (!v) return 'Choisissez un mot de passe.'
   if (v.length < 8) return '8 caractères minimum.'

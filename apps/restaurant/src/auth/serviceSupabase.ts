@@ -1,6 +1,8 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 import { supabaseKey, supabaseUrl } from '../config'
+import { completerHoraires, heureCourte, type Horaire } from '../profil/horaires'
+import { reduireImage } from '../profil/image'
 import { effacerBrouillon, sauverBrouillon } from './brouillon'
 import { ErreurMida, messageCompteExistant } from './erreurs'
 import {
@@ -10,6 +12,7 @@ import {
   type Compte,
   type InfosResponsable,
   type InfosRestaurant,
+  type ProfilEtHoraires,
   type Restaurant,
   type ResultatInscription,
   type ServiceRestaurant,
@@ -31,6 +34,9 @@ const stockageSession = {
     sessionStorage.removeItem(k)
   },
 }
+
+const messageSessionExpiree = 'Votre session a expiré. Connectez-vous à nouveau.'
+const messageModificationRefusee = "Ce compte n'a pas le droit de modifier ce restaurant."
 
 export function creerClientSupabase(): SupabaseClient {
   return createClient(supabaseUrl, supabaseKey, {
@@ -124,7 +130,7 @@ export class ServiceRestaurantSupabase implements ServiceRestaurant {
 
   async creerRestaurant(restaurant: InfosRestaurant): Promise<void> {
     const { data } = await this.client.auth.getUser()
-    if (!data.user) throw new ErreurMida('Votre session a expiré. Connectez-vous à nouveau.')
+    if (!data.user) throw new ErreurMida(messageSessionExpiree)
     // L'état n'est pas envoyé : la base le force à « en_attente » (déclencheur proteger_restaurant).
     const { error } = await this.client.from('restaurants').insert({
       responsable_id: data.user.id,
@@ -147,5 +153,98 @@ export class ServiceRestaurantSupabase implements ServiceRestaurant {
 
   async deconnecter(): Promise<void> {
     await this.client.auth.signOut()
+  }
+
+  async profilRestaurant(): Promise<ProfilEtHoraires> {
+    const { data: session } = await this.client.auth.getSession()
+    const id = session.session?.user.id
+    if (!id) throw new ErreurMida(messageSessionExpiree)
+
+    const { data: r, error } = await this.client
+      .from('restaurants')
+      .select('id, nom, categorie_id, telephone, adresse, ville, description, logo_url, etat')
+      .eq('responsable_id', id)
+      .maybeSingle()
+    if (error) throw error
+    if (!r) throw new ErreurMida("Aucun restaurant n'est inscrit avec ce compte.")
+
+    const { data: lignes, error: erreurHoraires } = await this.client
+      .from('horaires')
+      .select('jour, ferme, ouverture, fermeture')
+      .eq('restaurant_id', r.id)
+    if (erreurHoraires) throw erreurHoraires
+    const horaires: Horaire[] = (lignes ?? []).map((l) => ({
+      jour: l.jour,
+      ferme: l.ferme,
+      ouverture: heureCourte(l.ouverture),
+      fermeture: heureCourte(l.fermeture),
+    }))
+
+    return {
+      profil: {
+        id: r.id,
+        nom: r.nom,
+        categorieId: r.categorie_id,
+        telephone: r.telephone ?? '',
+        adresse: r.adresse,
+        ville: r.ville,
+        description: r.description ?? '',
+        logoUrl: r.logo_url,
+        etat: r.etat,
+      },
+      horaires: completerHoraires(horaires),
+      horairesEnregistres: horaires.length > 0,
+    }
+  }
+
+  async enregistrerProfil(restaurantId: string, infos: InfosRestaurant, horaires: Horaire[]): Promise<void> {
+    // L'état et le motif de refus ne sont jamais envoyés : seul l'admin les change.
+    const { data, error } = await this.client
+      .from('restaurants')
+      .update({
+        nom: infos.nom.trim(),
+        categorie_id: infos.categorieId,
+        telephone: infos.telephone,
+        adresse: infos.adresse.trim(),
+        ville: infos.ville,
+        description: infos.description.trim() || null,
+      })
+      .eq('id', restaurantId)
+      .select('id')
+    if (error) throw error
+    // Les règles d'accès ne renvoient pas d'erreur : elles ne modifient aucune ligne.
+    if (!data?.length) throw new ErreurMida(messageModificationRefusee)
+
+    const { error: erreurHoraires } = await this.client.from('horaires').upsert(
+      horaires.map((h) => ({
+        restaurant_id: restaurantId,
+        jour: h.jour,
+        ferme: h.ferme,
+        // un jour fermé garde ses heures (si elles existent) pour une réouverture
+        ouverture: h.ouverture || null,
+        fermeture: h.fermeture || null,
+      })),
+      { onConflict: 'restaurant_id,jour' },
+    )
+    if (erreurHoraires) throw erreurHoraires
+  }
+
+  async changerLogo(restaurantId: string, fichier: File): Promise<string> {
+    const image = await reduireImage(fichier)
+    // Chemin fixe (voir le README, « Stockage des images ») : le nouveau logo remplace l'ancien.
+    const chemin = `${restaurantId}/logo.webp`
+    const stockage = this.client.storage.from('restaurants')
+    const { error } = await stockage.upload(chemin, image, { upsert: true, contentType: image.type, cacheControl: '3600' })
+    if (error) throw error
+    // « ?v= » : sinon le navigateur garderait l'ancien logo en cache.
+    const url = `${stockage.getPublicUrl(chemin).data.publicUrl}?v=${Date.now()}`
+    const { data, error: erreurBase } = await this.client
+      .from('restaurants')
+      .update({ logo_url: url })
+      .eq('id', restaurantId)
+      .select('id')
+    if (erreurBase) throw erreurBase
+    if (!data?.length) throw new ErreurMida(messageModificationRefusee)
+    return url
   }
 }

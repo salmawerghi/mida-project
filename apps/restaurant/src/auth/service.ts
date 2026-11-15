@@ -1,5 +1,7 @@
 /** Opérations de compte utilisées par les écrans (remplaçables dans les tests). */
 
+import type { Horaire } from '../profil/horaires'
+
 export type EtatRestaurant = 'en_attente' | 'actif' | 'rejete' | 'bloque'
 
 export interface Restaurant {
@@ -38,6 +40,28 @@ export interface Categorie {
   nom: string
 }
 
+/** Profil complet du restaurant, tel qu'il est modifiable par son responsable (US07). */
+export interface ProfilRestaurant {
+  id: string
+  nom: string
+  categorieId: string | null
+  /** Tel qu'enregistré : « +216 xx xxx xxx », ou vide. */
+  telephone: string
+  adresse: string
+  ville: string
+  description: string
+  logoUrl: string | null
+  etat: EtatRestaurant
+}
+
+export interface ProfilEtHoraires {
+  profil: ProfilRestaurant
+  /** Toujours les 7 jours, du lundi au dimanche. */
+  horaires: Horaire[]
+  /** `false` tant que le responsable n'a jamais enregistré ses horaires. */
+  horairesEnregistres: boolean
+}
+
 export type ResultatInscription =
   /** Compte et restaurant créés, session ouverte. */
   | 'connecte'
@@ -55,6 +79,13 @@ export interface ServiceRestaurant {
   creerRestaurant(restaurant: InfosRestaurant): Promise<void>
   categories(): Promise<Categorie[]>
   deconnecter(): Promise<void>
+
+  /** Profil et horaires du restaurant du responsable connecté. */
+  profilRestaurant(): Promise<ProfilEtHoraires>
+  /** Enregistre les informations et les 7 jours d'horaires. */
+  enregistrerProfil(restaurantId: string, infos: InfosRestaurant, horaires: Horaire[]): Promise<void>
+  /** Envoie le nouveau logo et renvoie son adresse publique. */
+  changerLogo(restaurantId: string, fichier: File): Promise<string>
 }
 
 /** Seuls les comptes « responsable » non bloqués utilisent l'espace restaurant. */

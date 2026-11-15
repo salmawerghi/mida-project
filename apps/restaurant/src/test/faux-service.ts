@@ -1,6 +1,15 @@
 import { vi } from 'vitest'
 
-import type { Compte, InfosResponsable, InfosRestaurant, ResultatInscription, ServiceRestaurant } from '../auth/service'
+import type {
+  Compte,
+  InfosResponsable,
+  InfosRestaurant,
+  ProfilEtHoraires,
+  ProfilRestaurant,
+  ResultatInscription,
+  ServiceRestaurant,
+} from '../auth/service'
+import { horairesParDefaut, type Horaire } from '../profil/horaires'
 
 /** Faux service : garde le compte en mémoire et enregistre les appels. */
 export class FauxService implements ServiceRestaurant {
@@ -29,6 +38,38 @@ export class FauxService implements ServiceRestaurant {
   deconnecter = vi.fn(async () => {
     this.compte = null
     this.prevenir()
+  })
+
+  /** Profil renvoyé par `profilRestaurant` (US07). */
+  profil: ProfilRestaurant = {
+    id: 'r1',
+    nom: 'Dar Zitouna',
+    categorieId: 'k1',
+    telephone: '+216 71 744 210',
+    adresse: '34, avenue Habib Bourguiba, La Marsa',
+    ville: 'Tunis',
+    description: 'Cuisine familiale de la médina.',
+    logoUrl: null,
+    etat: 'actif',
+  }
+  horaires: Horaire[] = horairesParDefaut().map((h) => (h.jour === 1 ? { ...h, ferme: true } : h))
+  horairesEnregistres = true
+  erreurProfil: unknown = null
+
+  async profilRestaurant(): Promise<ProfilEtHoraires> {
+    return { profil: this.profil, horaires: this.horaires, horairesEnregistres: this.horairesEnregistres }
+  }
+
+  enregistrerProfil = vi.fn(async (_id: string, infos: InfosRestaurant, _horaires: Horaire[]) => {
+    if (this.erreurProfil) throw this.erreurProfil
+    if (this.compte?.restaurant) {
+      this.compte = { ...this.compte, restaurant: { ...this.compte.restaurant, nom: infos.nom.trim(), ville: infos.ville } }
+    }
+  })
+
+  changerLogo = vi.fn(async (_id: string, fichier: File) => {
+    if (this.erreurProfil) throw this.erreurProfil
+    return `https://exemple.test/restaurants/r1/${fichier.name}`
   })
 
   constructor(compte: Compte | null = null) {

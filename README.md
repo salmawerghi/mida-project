@@ -27,6 +27,7 @@ apps/
 | US04 | Appli client : inscription (nom, e-mail, téléphone +216, mot de passe), connexion, session conservée, déconnexion ; comptes non clients ou bloqués refusés | fait : 24 tests OK, essayé sur émulateur avec le vrai projet Supabase, puis installé sur un vrai téléphone (APK release) |
 | US05 | Espace restaurant web : inscription en 2 étapes (responsable puis restaurant), compte et restaurant « en attente » de validation, connexion, écran d'attente ou de refus (avec motif), pages réservées aux responsables connectés | fait : 27 tests Vitest + test PGlite, essayé avec le vrai projet Supabase |
 | US06 | Mot de passe oublié (appli client) : e-mail → code reçu par e-mail → nouveau mot de passe, puis session ouverte | codé, 13 tests OK ; **lien masqué** dans l'appli et essai réel en attente du réglage e-mail de Supabase (voir plus bas) |
+| US07 | Profil du restaurant (espace web) : nom, catégorie, adresse, ville, téléphone, description, logo et horaires des 7 jours ; ouvert dès l'inscription, même avant la validation | codé : 21 tests Vitest + 5 tests PGlite ; essai réel à faire |
 
 US01 à US03 sont appliquées sur le projet Supabase de Mida (`tpfpuwlgnxhwhezicuto`) ; le jeu de test n'y est pas encore chargé.
 
@@ -116,7 +117,7 @@ flutter run         # se connecte au projet Supabase de Mida (lib/config.dart)
 cd apps/restaurant
 npm install
 npm run dev         # http://localhost:5173 — se connecte au projet Supabase de Mida (src/config.ts)
-npm test            # 27 tests (Vitest)
+npm test            # 48 tests (Vitest)
 npm run build       # vérification TypeScript + version de production dans dist/
 ```
 
@@ -125,6 +126,17 @@ npm run build       # vérification TypeScript + version de production dans dist
 - Les comptes client, livreur, admin ou bloqués sont refusés avec un message qui indique la bonne application.
 - Reportés à US07 (profil du restaurant) : matricule fiscal et logo.
 - Essai du 15/11/2026 dans le navigateur avec le vrai projet Supabase : inscription d'un responsable et de son restaurant (Ariana), profil `responsable` / `en_attente`, restaurant `en_attente`, rôle présent dans le jeton (hook). « Confirm email » doit rester désactivé pendant les essais (sinon Supabase refuse les adresses `@mida.test`).
+
+### Profil du restaurant (US07)
+
+Page `/profil` (`src/pages/Profil.tsx`), dans le cadre à menu latéral (`src/Cadre.tsx`) partagé avec le tableau de bord.
+
+- **Informations** : nom, catégorie, adresse, ville, téléphone, description → `update` de la ligne `restaurants`. L'état et le motif de refus ne sont jamais envoyés (réservés à l'admin).
+- **Logo** : JPEG, PNG ou WebP, 5 Mo maximum ; l'image est réduite à 512 px et convertie en WebP dans le navigateur, puis envoyée à `restaurants/<restaurant_id>/logo.webp` (`upsert`) ; `restaurants.logo_url` reçoit l'URL publique suivie de `?v=<date>`.
+- **Horaires** : les 7 jours sont enregistrés d'un coup (`upsert` sur `restaurant_id, jour`). Un jour décoché est « fermé ». Une fermeture avant l'ouverture (18:00 → 02:00) veut dire « ferme après minuit ». Tant que rien n'est enregistré, la page propose 11:00 – 23:00.
+- **Accès** : dès que le restaurant est inscrit, même en attente ou refusé (lien sur la page d'attente). Les clients ne voient le restaurant et ses horaires qu'une fois validé (règles US02) ; pour un restaurant validé, la modification est visible tout de suite, sans autre étape.
+- Pas de migration : les règles d'accès des US02 et US03 suffisent (vérifié par les tests « US07 » de `supabase/tests`).
+- Reportés : photo de couverture, position sur la carte, matricule fiscal ; l'interrupteur ouvert / fermé est la story US08.
 
 ## Mot de passe oublié (US06) — en attente du réglage e-mail
 

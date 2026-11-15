@@ -38,6 +38,14 @@ export function messageErreur(erreur: unknown): string {
     if (code === 'signup_disabled') return 'Les inscriptions sont momentanément fermées.'
   }
 
+  // Erreurs du stockage des images : { statusCode, message }
+  if (typeof erreur === 'object' && erreur !== null && 'statusCode' in erreur) {
+    const statut = String((erreur as { statusCode: unknown }).statusCode)
+    if (statut === '413') return 'Image trop lourde : 5 Mo maximum.'
+    if (statut === '415') return 'Format non accepté : choisissez une image JPEG, PNG ou WebP.'
+    if (statut === '401' || statut === '403') return "Ce compte n'a pas le droit de modifier cette image."
+  }
+
   // Erreurs de la base (PostgREST) : { code, message, details }
   if (typeof erreur === 'object' && erreur !== null && 'code' in erreur) {
     const code = String((erreur as { code: unknown }).code)

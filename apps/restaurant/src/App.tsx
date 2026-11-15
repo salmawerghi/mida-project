@@ -7,6 +7,7 @@ import { Chargement } from './composants'
 import Attente from './pages/Attente'
 import Connexion from './pages/Connexion'
 import Inscription from './pages/Inscription'
+import Profil from './pages/Profil'
 import Tableau from './pages/Tableau'
 
 /**
@@ -14,13 +15,21 @@ import Tableau from './pages/Tableau'
  * connexion. Connecté mais pas sur la bonne page pour l'état de son
  * restaurant (pas encore inscrit, en attente, validé) : redirection.
  */
-export function PageProtegee({ page, rendu }: { page: '/attente' | '/tableau'; rendu: (compte: Compte) => ReactElement }) {
+export function PageProtegee({
+  page,
+  rendu,
+}: {
+  page: '/attente' | '/tableau' | '/profil'
+  rendu: (compte: Compte) => ReactElement
+}) {
   const { etat } = useSession()
   const location = useLocation()
   if (etat.statut === 'chargement') return <Chargement />
   if (etat.statut === 'deconnecte') return <Navigate to="/connexion" replace state={{ depuis: location.pathname }} />
   const attendue = pageDuCompte(etat.compte)
-  if (attendue !== page) return <Navigate to={attendue} replace />
+  // Le profil est ouvert dès que le restaurant est inscrit, même avant sa validation (US07).
+  const autorisee = page === '/profil' ? etat.compte.restaurant !== null : attendue === page
+  if (!autorisee) return <Navigate to={attendue} replace />
   return rendu(etat.compte)
 }
 
@@ -38,6 +47,7 @@ export function Routage() {
       <Route path="/inscription" element={<Inscription />} />
       <Route path="/attente" element={<PageProtegee page="/attente" rendu={(c) => <Attente compte={c} />} />} />
       <Route path="/tableau" element={<PageProtegee page="/tableau" rendu={(c) => <Tableau compte={c} />} />} />
+      <Route path="/profil" element={<PageProtegee page="/profil" rendu={(c) => <Profil compte={c} />} />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

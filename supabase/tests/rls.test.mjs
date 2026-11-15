@@ -455,3 +455,85 @@ test('US03 · documents des livreurs : privés et figés une fois validés', asy
     assert.equal(n, 2);
   }, docs);
 });
+
+// =====================================================================
+// US07 — profil du restaurant (informations, logo, horaires)
+// =====================================================================
+// Ce que fait l'espace restaurant : remplacer les 7 jours d'un coup.
+const HORAIRES_7_JOURS = (restaurant) => `
+  insert into public.horaires (restaurant_id, jour, ouverture, fermeture, ferme)
+  select '${restaurant}', j, case when j = 1 then null else time '12:00' end,
+         case when j = 1 then null else time '23:30' end, j = 1
+  from generate_series(1, 7) as j
+  on conflict (restaurant_id, jour) do update
+    set ouverture = excluded.ouverture, fermeture = excluded.fermeture, ferme = excluded.ferme`;
+
+test('US07 · un responsable modifie le profil et les horaires de son restaurant', async () => {
+  await en('zitouna', async () => {
+    assert.equal(await nbModifiees(
+      `update public.restaurants
+       set nom = 'Dar Zitouna Marsa', adresse = '12 rue du Pacha, Tunis', telephone = '+216 71 555 010',
+           description = 'Nouvelle carte', logo_url = 'https://exemple.test/logo.webp?v=2'
+       where id = $1`, [R_ZITOUNA]), 1);
+    await requete(HORAIRES_7_JOURS(R_ZITOUNA));
+    const h = await lignes(`select jour, ferme, ouverture::text from public.horaires
+                            where restaurant_id = $1 order by jour`, [R_ZITOUNA]);
+    assert.equal(h.length, 7);                       // remplacés, pas doublés
+    assert.deepEqual(h[0], { jour: 1, ferme: true, ouverture: null });
+    assert.deepEqual(h[6], { jour: 7, ferme: false, ouverture: '12:00:00' });
+    // l'état reste réservé à l'administrateur
+    await assert.rejects(lignes(`update public.restaurants set etat = 'bloque' where id = $1`, [R_ZITOUNA]),
+                         /Seul un administrateur/);
+  });
+});
+
+test('US07 · les modifications sont visibles tout de suite par les visiteurs et les clients', async () => {
+  const modification = `
+    update public.restaurants set nom = 'Dar Zitouna Marsa' where id = '${R_ZITOUNA}';
+    ${HORAIRES_7_JOURS(R_ZITOUNA)};`;
+  for (const lecteur of [null, 'amine']) {
+    await en(lecteur, async () => {
+      assert.deepEqual(await lignes(`select nom from public.restaurants where id = $1`, [R_ZITOUNA]),
+                       [{ nom: 'Dar Zitouna Marsa' }]);
+      const [{ n }] = await lignes(`select count(*)::int as n from public.horaires
+                                    where restaurant_id = $1 and (ferme or ouverture = '12:00')`, [R_ZITOUNA]);
+      assert.equal(n, 7);
+    }, modification);
+  }
+});
+
+test('US07 · personne ne modifie le profil ou les horaires d\'un autre restaurant', async () => {
+  for (const intrus of ['zitouna', 'amine']) {
+    await en(intrus, async () => {
+      assert.equal(await nbModifiees(`update public.restaurants set nom = 'Piraté' where id = $1`, [R_KANOUN]), 0);
+      assert.equal(await nbModifiees(`update public.horaires set ferme = true where restaurant_id = $1`, [R_KANOUN]), 0);
+      assert.equal(await nbModifiees(`delete from public.horaires where restaurant_id = $1`, [R_KANOUN]), 0);
+      await assert.rejects(requete(HORAIRES_7_JOURS(R_KANOUN)), RLS);
+    });
+  }
+  await en(null, async () => {
+    assert.equal(await nbModifiees(`update public.restaurants set nom = 'Piraté' where id = $1`, [R_KANOUN]), 0);
+    assert.equal(await nbModifiees(`update public.horaires set ferme = true where restaurant_id = $1`, [R_KANOUN]), 0);
+  });
+});
+
+test('US07 · restaurant en attente : profil déjà modifiable, invisible des clients', async () => {
+  let restaurant;
+  await en('lellabeya', async () => {
+    [{ id: restaurant }] = await lignes(`select id from public.restaurants where responsable_id = auth.uid()`);
+    assert.equal(await nbModifiees(`update public.restaurants set description = 'Bientôt ouvert' where id = $1`, [restaurant]), 1);
+    await requete(HORAIRES_7_JOURS(restaurant));
+    const [{ n }] = await lignes(`select count(*)::int as n from public.horaires where restaurant_id = $1`, [restaurant]);
+    assert.equal(n, 7);
+  });
+  await en(null, async () => {
+    assert.deepEqual(await lignes(`select id from public.horaires where restaurant_id = $1`, [restaurant]), []);
+  }, HORAIRES_7_JOURS(restaurant));
+});
+
+test('US07 · un responsable bloqué ne modifie plus son restaurant', async () => {
+  await en('zitouna', async () => {
+    assert.equal(await nbModifiees(`update public.restaurants set nom = 'X' where id = $1`, [R_ZITOUNA]), 0);
+    await assert.rejects(requete(HORAIRES_7_JOURS(R_ZITOUNA)), RLS);
+  }, `update public.profiles set etat_compte = 'bloque' where email = 'zitouna@mida.test'`);
+});

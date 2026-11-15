@@ -7,9 +7,11 @@ import type {
   ProfilEtHoraires,
   ProfilRestaurant,
   ResultatInscription,
+  ResultatPlat,
   ServiceRestaurant,
 } from '../auth/service'
 import type { CategorieMenu } from '../menu/categories'
+import type { InfosPlat, Plat } from '../menu/plats'
 import { horairesParDefaut, type Horaire } from '../profil/horaires'
 
 /** Faux service : garde le compte en mémoire et enregistre les appels. */
@@ -50,7 +52,11 @@ export class FauxService implements ServiceRestaurant {
   erreurMenu: unknown = null
   private prochainId = 10
 
-  categoriesMenu = vi.fn(async (_restaurant: string) => [...this.menu].sort((a, b) => a.ordre - b.ordre))
+  categoriesMenu = vi.fn(async (_restaurant: string) =>
+    [...this.menu]
+      .sort((a, b) => a.ordre - b.ordre)
+      .map((c) => ({ ...c, nbPlats: this.plats.filter((p) => p.categorieId === c.id).length })),
+  )
 
   creerCategorieMenu = vi.fn(async (_restaurant: string, nom: string, ordre: number) => {
     if (this.erreurMenu) throw this.erreurMenu
@@ -70,6 +76,43 @@ export class FauxService implements ServiceRestaurant {
   supprimerCategorieMenu = vi.fn(async (id: string) => {
     if (this.erreurMenu) throw this.erreurMenu
     this.menu = this.menu.filter((c) => c.id !== id)
+    this.plats = this.plats.filter((p) => p.categorieId !== id)
+  })
+
+  /** Plats gardés en mémoire (US10). */
+  plats: Plat[] = [
+    { id: 'p1', categorieId: 'c1', nom: 'Couscous à l’agneau', description: 'Semoule fine, agneau', prix: 18, imageUrl: null, disponible: true },
+    { id: 'p2', categorieId: 'c1', nom: 'Couscous aux légumes', description: '', prix: 13, imageUrl: 'https://exemple.test/p2.webp', disponible: true },
+    { id: 'p3', categorieId: 'c1', nom: 'Couscous au poisson', description: 'Mérou', prix: 22.5, imageUrl: null, disponible: true },
+    { id: 'p4', categorieId: 'c3', nom: 'Thé à la menthe', description: '', prix: 2.5, imageUrl: null, disponible: true },
+  ]
+  erreurPlat: unknown = null
+  /** Simule une photo refusée par le stockage (le plat est quand même enregistré). */
+  erreurPhoto: string | null = null
+
+  platsMenu = vi.fn(async (_restaurant: string) => [...this.plats])
+
+  enregistrerPlat = vi.fn(
+    async (_restaurant: string, platId: string | null, infos: InfosPlat, photo: File | null): Promise<ResultatPlat> => {
+      if (this.erreurPlat) throw this.erreurPlat
+      const ancien = this.plats.find((p) => p.id === platId)
+      const plat: Plat = {
+        id: platId ?? `p${this.prochainId++}`,
+        categorieId: infos.categorieId,
+        nom: infos.nom.trim(),
+        description: infos.description.trim(),
+        prix: infos.prix,
+        imageUrl: photo && !this.erreurPhoto ? `https://exemple.test/${photo.name}` : (ancien?.imageUrl ?? null),
+        disponible: ancien?.disponible ?? true,
+      }
+      this.plats = ancien ? this.plats.map((p) => (p.id === plat.id ? plat : p)) : [...this.plats, plat]
+      return { plat, erreurPhoto: photo ? this.erreurPhoto : null }
+    },
+  )
+
+  supprimerPlat = vi.fn(async (_restaurant: string, plat: Plat) => {
+    if (this.erreurPlat) throw this.erreurPlat
+    this.plats = this.plats.filter((p) => p.id !== plat.id)
   })
 
   erreurOuverture: unknown = null

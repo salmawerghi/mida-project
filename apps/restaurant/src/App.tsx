@@ -8,6 +8,7 @@ import Attente from './pages/Attente'
 import Connexion from './pages/Connexion'
 import Inscription from './pages/Inscription'
 import Menu from './pages/Menu'
+import PlatForm from './pages/PlatForm'
 import Profil from './pages/Profil'
 import Tableau from './pages/Tableau'
 
@@ -49,6 +50,8 @@ export function Routage() {
       <Route path="/attente" element={<PageProtegee page="/attente" rendu={(c) => <Attente compte={c} />} />} />
       <Route path="/tableau" element={<PageProtegee page="/tableau" rendu={(c) => <Tableau compte={c} />} />} />
       <Route path="/menu" element={<PageProtegee page="/menu" rendu={(c) => <Menu compte={c} />} />} />
+      <Route path="/menu/plats/nouveau" element={<PageProtegee page="/menu" rendu={(c) => <PlatForm compte={c} />} />} />
+      <Route path="/menu/plats/:id" element={<PageProtegee page="/menu" rendu={(c) => <PlatForm compte={c} />} />} />
       <Route path="/profil" element={<PageProtegee page="/profil" rendu={(c) => <Profil compte={c} />} />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

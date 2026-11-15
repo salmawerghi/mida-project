@@ -27,7 +27,7 @@ const valide: Compte = {
 
 /** Noms des catégories, dans l'ordre affiché. */
 const nomsAffiches = () =>
-  within(screen.getByRole('list'))
+  within(within(screen.getByRole('region', { name: 'Catégories du menu' })).getByRole('list'))
     .getAllByRole('listitem')
     .map((li) => li.querySelector('.menu-nom')?.firstChild?.textContent)
 

@@ -32,6 +32,7 @@ apps/
 | US07 | Profil du restaurant (espace web) : nom, catégorie, adresse, ville, téléphone, description, logo et horaires des 7 jours ; ouvert dès l'inscription, même avant la validation | codé : 21 tests Vitest + 5 tests PGlite ; essai réel à faire |
 | US08 | Ouvrir ou fermer son restaurant en un clic (interrupteur du menu de l'espace web) ; un restaurant fermé ou non validé ne reçoit plus de nouvelle commande | codé : 4 tests Vitest + 4 tests PGlite, migration appliquée sur Supabase ; essai réel à faire (il faut un restaurant validé) ; affichage côté client avec le catalogue |
 | US09 | Catégories du menu (espace web, page « Menu ») : créer, renommer, ordonner ; suppression avec confirmation, qui annonce et supprime les plats de la catégorie | codé : 16 tests Vitest + 4 tests PGlite, fonction appliquée sur Supabase ; essai réel à faire |
+| US10 | Plats (espace web) : ajouter, modifier, supprimer un plat avec nom, description, prix positif, photo et catégorie ; aperçu côté client dans le formulaire | codé : 15 tests Vitest + 5 tests PGlite ; essai réel à faire ; affichage dans l'appli client avec le catalogue |
 
 US01 à US03, US08 et US09 sont appliquées sur le projet Supabase de Mida (`tpfpuwlgnxhwhezicuto`) ; le jeu de test n'y est pas encore chargé.
 
@@ -123,7 +124,7 @@ flutter run         # se connecte au projet Supabase de Mida (lib/config.dart)
 cd apps/restaurant
 npm install
 npm run dev         # http://localhost:5173 — se connecte au projet Supabase de Mida (src/config.ts)
-npm test            # 68 tests (Vitest)
+npm test            # 83 tests (Vitest)
 npm run build       # vérification TypeScript + version de production dans dist/
 ```
 
@@ -159,6 +160,15 @@ Page `/profil` (`src/pages/Profil.tsx`), dans le cadre à menu latéral (`src/Ca
 - Une catégorie a un **nom** (40 caractères au plus, unique dans le menu, sans tenir compte des majuscules) et un **ordre d'affichage**. Une nouvelle catégorie va à la fin ; les flèches la montent ou la descendent, et l'ordre complet est enregistré en une seule requête (`upsert`, `ordre` = 1, 2, 3…).
 - **Suppression** : toujours confirmée. Si la catégorie contient des plats, la confirmation l'annonce (« contient 3 plats… ces plats seront supprimés ») et le bouton le répète. La base refuse de supprimer directement une catégorie qui contient des plats ; l'espace restaurant appelle donc la fonction `supprimer_categorie_menu` (migration `20261115000002`), qui supprime les plats puis la catégorie dans la même transaction, avec les droits de l'appelant. Les commandes déjà passées gardent le nom et le prix des plats supprimés.
 - Les plats eux-mêmes (nom, prix, photo) : US10.
+
+### Plats (US10)
+
+- Sur la page `/menu`, chaque catégorie liste ses plats (photo, nom, description, prix) avec « Modifier » et « Supprimer » (confirmation). Le formulaire est sur `/menu/plats/nouveau` (`?categorie=<id>` pour présélectionner la catégorie) et `/menu/plats/<id>` (`src/pages/PlatForm.tsx`).
+- **Prix** en dinars avec 3 décimales : « 16 », « 16,5 », « 16.500 » ou « 16,000 DT » sont acceptés ; il doit être positif (la base le refuse aussi : `prix > 0`) et au plus 1 000 DT. Affichage tunisien : « 16,500 DT ».
+- **Photo** (facultative) : JPEG, PNG ou WebP, 5 Mo au plus, réduite à 800 px et convertie en WebP, envoyée à `restaurants/<restaurant_id>/plats/<plat_id>.webp`. L'identifiant du plat est choisi par l'appli (`crypto.randomUUID()`) pour nommer la photo. Le plat est enregistré d'abord : si la photo échoue, il reste au menu sans photo et un avertissement invite à réessayer. Supprimer un plat retire aussi sa photo du stockage (pas encore pour les plats supprimés avec leur catégorie).
+- **Catégorie** : obligatoire, et forcément une catégorie du même restaurant (clé étrangère composée de la migration US01).
+- **Côté client** : les plats d'un restaurant validé sont lisibles par les visiteurs et les clients (vérifié par les tests « US10 » de `supabase/tests`) ; l'appli client les affichera avec l'écran du restaurant (pas encore développé).
+- La case « disponible » (plat épuisé) est la story US11.
 
 ## Mot de passe oublié (US06) — en attente du réglage e-mail
 

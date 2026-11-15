@@ -2,8 +2,10 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 import { supabaseKey, supabaseUrl } from '../config'
 import { messageCategorieExistante, type CategorieMenu } from '../menu/categories'
+import type { InfosPlat, Plat } from '../menu/plats'
 import { completerHoraires, heureCourte, type Horaire } from '../profil/horaires'
 import { reduireImage } from '../profil/image'
+import { messageErreur } from './erreurs'
 import { effacerBrouillon, sauverBrouillon } from './brouillon'
 import { ErreurMida, messageCompteExistant } from './erreurs'
 import {
@@ -14,6 +16,7 @@ import {
   type InfosResponsable,
   type InfosRestaurant,
   type ProfilEtHoraires,
+  type ResultatPlat,
   type Restaurant,
   type ResultatInscription,
   type ServiceRestaurant,
@@ -299,6 +302,88 @@ export class ServiceRestaurantSupabase implements ServiceRestaurant {
     // Fonction de la base (migration US09) : supprime les plats puis la catégorie, dans la même transaction.
     const { error } = await this.client.rpc('supprimer_categorie_menu', { p_categorie: categorieId })
     if (error) throw error
+  }
+
+  async platsMenu(restaurantId: string): Promise<Plat[]> {
+    const { data, error } = await this.client
+      .from('plats')
+      .select('id, categorie_id, nom, description, prix, image_url, disponible')
+      .eq('restaurant_id', restaurantId)
+      .order('nom')
+    if (error) throw error
+    return (data ?? []).map(versPlat)
+  }
+
+  async enregistrerPlat(
+    restaurantId: string,
+    platId: string | null,
+    infos: InfosPlat,
+    photo: File | null,
+  ): Promise<ResultatPlat> {
+    const champs = {
+      categorie_id: infos.categorieId,
+      nom: infos.nom.trim(),
+      description: infos.description.trim() || null,
+      prix: infos.prix,
+    }
+    // L'identifiant est choisi ici pour nommer la photo avant même la création.
+    const id = platId ?? crypto.randomUUID()
+    const requete = platId
+      ? this.client.from('plats').update(champs).eq('id', platId)
+      : this.client.from('plats').insert({ id, restaurant_id: restaurantId, ...champs })
+    const { data, error } = await requete.select(colonnesPlat).maybeSingle()
+    if (error) throw error
+    if (!data) throw new ErreurMida(messageMenuRefuse)
+    let plat = versPlat(data)
+
+    if (!photo) return { plat, erreurPhoto: null }
+    try {
+      const image = await reduireImage(photo, 800)
+      // Chemin fixe (README, « Stockage des images ») : la nouvelle photo remplace l'ancienne.
+      const chemin = `${restaurantId}/plats/${id}.webp`
+      const stockage = this.client.storage.from('restaurants')
+      const envoi = await stockage.upload(chemin, image, { upsert: true, contentType: image.type, cacheControl: '3600' })
+      if (envoi.error) throw envoi.error
+      const url = `${stockage.getPublicUrl(chemin).data.publicUrl}?v=${Date.now()}`
+      const maj = await this.client.from('plats').update({ image_url: url }).eq('id', id).select(colonnesPlat).maybeSingle()
+      if (maj.error) throw maj.error
+      if (maj.data) plat = versPlat(maj.data)
+      return { plat, erreurPhoto: null }
+    } catch (e) {
+      return { plat, erreurPhoto: messageErreur(e) }
+    }
+  }
+
+  async supprimerPlat(restaurantId: string, plat: Plat): Promise<void> {
+    const { data, error } = await this.client.from('plats').delete().eq('id', plat.id).select('id')
+    if (error) throw error
+    if (!data?.length) throw new ErreurMida(messageMenuRefuse)
+    // La photo n'est plus utilisée : on la retire du stockage (sans bloquer si elle n'existe pas).
+    if (plat.imageUrl) await this.client.storage.from('restaurants').remove([`${restaurantId}/plats/${plat.id}.webp`])
+  }
+}
+
+const colonnesPlat = 'id, categorie_id, nom, description, prix, image_url, disponible'
+
+interface LignePlat {
+  id: string
+  categorie_id: string
+  nom: string
+  description: string | null
+  prix: number | string // numeric : PostgREST peut le renvoyer en texte
+  image_url: string | null
+  disponible: boolean
+}
+
+function versPlat(l: LignePlat): Plat {
+  return {
+    id: l.id,
+    categorieId: l.categorie_id,
+    nom: l.nom,
+    description: l.description ?? '',
+    prix: Number(l.prix),
+    imageUrl: l.image_url,
+    disponible: l.disponible,
   }
 }
 

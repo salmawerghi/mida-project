@@ -698,3 +698,68 @@ test('US09 · le menu est lu dans l\'ordre choisi ; celui d\'un restaurant en at
     assert.ok(n >= 1);
   });
 });
+
+// =====================================================================
+// US10 — plats du menu
+// =====================================================================
+const M_Z_TAJINES = '30000000-0000-4000-8000-000000000002';   // Dar Zitouna
+const NOUVEAU_PLAT = `insert into public.plats (id, restaurant_id, categorie_id, nom, description, prix)
+  values ('41000000-0000-4000-8000-000000000001', $1, $2, 'Tajine malsouka', 'Poulet, oeufs, fromage', $3)`;
+
+test('US10 · un responsable ajoute, modifie et supprime un plat de son menu', async () => {
+  await en('zitouna', async () => {
+    await requete(NOUVEAU_PLAT, [R_ZITOUNA, M_Z_TAJINES, 14.5]);
+    assert.equal(await nbModifiees(`update public.plats set prix = 15.250, nom = 'Tajine malsouka maison',
+                                    image_url = 'https://exemple.test/p.webp?v=1'
+                                    where id = '41000000-0000-4000-8000-000000000001'`), 1);
+    const [p] = await lignes(`select nom, prix::text, disponible from public.plats where id = '41000000-0000-4000-8000-000000000001'`);
+    assert.deepEqual(p, { nom: 'Tajine malsouka maison', prix: '15.250', disponible: true });
+    assert.equal(await nbModifiees(`delete from public.plats where id = '41000000-0000-4000-8000-000000000001'`), 1);
+  });
+});
+
+test('US10 · le prix doit être un nombre positif', async () => {
+  await en('zitouna', async () => {
+    for (const prix of [0, -16]) {
+      await assert.rejects(requete(NOUVEAU_PLAT, [R_ZITOUNA, M_Z_TAJINES, prix]), /check/i);
+    }
+    await assert.rejects(lignes(`update public.plats set prix = -1 where restaurant_id = $1`, [R_ZITOUNA]), /check/i);
+  });
+});
+
+test('US10 · un plat est rangé dans une catégorie de son propre restaurant', async () => {
+  await en('zitouna', async () => {
+    // catégorie d'El Kanoun : refusée par la clé étrangère composée
+    await assert.rejects(requete(NOUVEAU_PLAT, [R_ZITOUNA, M_K_OJJA, 10]), /foreign key/i);
+    // ni dans le menu d'un autre restaurant
+    await assert.rejects(requete(NOUVEAU_PLAT, [R_KANOUN, M_K_OJJA, 10]), RLS);
+    assert.equal(await nbModifiees(`update public.plats set prix = 1 where restaurant_id = $1`, [R_KANOUN]), 0);
+    assert.equal(await nbModifiees(`delete from public.plats where restaurant_id = $1`, [R_KANOUN]), 0);
+  });
+});
+
+test('US10 · le plat apparaît dans le menu côté client (restaurant validé seulement)', async () => {
+  const ajout = `insert into public.plats (restaurant_id, categorie_id, nom, prix)
+                 values ('${R_ZITOUNA}', '${M_Z_TAJINES}', 'Tajine malsouka', 14.5);
+                 insert into public.categories_menu (id, restaurant_id, nom)
+                 select '31000000-0000-4000-8000-000000000001', id, 'Poissons' from public.restaurants where nom = 'Lella Béya';
+                 insert into public.plats (restaurant_id, categorie_id, nom, prix)
+                 select id, '31000000-0000-4000-8000-000000000001', 'Loup grillé', 30 from public.restaurants where nom = 'Lella Béya';`;
+  for (const lecteur of [null, 'amine']) {
+    await en(lecteur, async () => {
+      // le menu tel que l'appli client le lira : catégories dans l'ordre, plats avec leur prix
+      const menu = await lignes(`select c.nom as categorie, p.nom, p.prix::text from public.plats p
+                                 join public.categories_menu c on c.id = p.categorie_id
+                                 where p.restaurant_id = $1 and p.nom = 'Tajine malsouka'`, [R_ZITOUNA]);
+      assert.deepEqual(menu, [{ categorie: 'Tajines', nom: 'Tajine malsouka', prix: '14.500' }]);
+      assert.deepEqual(await lignes(`select id from public.plats where nom = 'Loup grillé'`), []);
+    }, ajout);
+  }
+});
+
+test('US10 · la photo d\'un plat va dans le dossier de son restaurant', async () => {
+  await en('zitouna', async () => {
+    await envoyer('restaurants', `${R_ZITOUNA}/plats/41000000-0000-4000-8000-000000000001.webp`);
+    await assert.rejects(envoyer('restaurants', `${R_KANOUN}/plats/41000000-0000-4000-8000-000000000001.webp`), RLS);
+  });
+});

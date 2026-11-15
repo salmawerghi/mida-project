@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { Link, useLocation } from 'react-router'
 
 import { messageErreur } from '../auth/erreurs'
 import type { Compte } from '../auth/service'
@@ -14,31 +15,45 @@ import {
   validerNomCategorie,
   type CategorieMenu,
 } from '../menu/categories'
+import { formaterPrix, type Plat } from '../menu/plats'
+import type { RetourMenu } from './PlatForm'
 
-/** Action en cours sur une catégorie : une seule à la fois. */
-type Action = { type: 'creation' } | { type: 'renommage'; id: string } | { type: 'suppression'; id: string } | null
+/** Action en cours (sur une catégorie ou un plat) : une seule à la fois. */
+type Action =
+  | { type: 'creation' }
+  | { type: 'renommage'; id: string }
+  | { type: 'suppression'; id: string }
+  | { type: 'suppressionPlat'; id: string }
+  | null
 
 /**
- * Menu du restaurant (maquette « Restaurant · Menu »). Pour l'instant :
- * les catégories (US09). Les plats arrivent avec US10.
+ * Menu du restaurant (maquette « Restaurant · Menu ») : les catégories
+ * (US09) et les plats rangés dans chacune (US10).
  */
 export default function Menu({ compte }: { compte: Compte }) {
   const { service } = useSession()
   const restaurant = compte.restaurant!
 
+  // message laissé par le formulaire d'un plat après l'enregistrement
+  const retour = useLocation().state as RetourMenu | null
+
   const [categories, setCategories] = useState<CategorieMenu[] | null>(null)
+  const [plats, setPlats] = useState<Plat[]>([])
   const [erreurChargement, setErreurChargement] = useState<string | null>(null)
   const [action, setAction] = useState<Action>(null)
   const [nom, setNom] = useState('')
   const [erreurNom, setErreurNom] = useState<string | null>(null)
   const [enCours, setEnCours] = useState(false)
   const [erreur, setErreur] = useState<string | null>(null)
-  const [confirmation, setConfirmation] = useState<string | null>(null)
+  const [confirmation, setConfirmation] = useState<string | null>(retour?.message ?? null)
+  const [avertissement, setAvertissement] = useState<string | null>(retour?.avertissement ?? null)
 
   const charger = useCallback(async () => {
     setErreurChargement(null)
     try {
-      setCategories(await service.categoriesMenu(restaurant.id))
+      const [liste, tous] = await Promise.all([service.categoriesMenu(restaurant.id), service.platsMenu(restaurant.id)])
+      setCategories(liste)
+      setPlats(tous)
     } catch (e) {
       setErreurChargement(messageErreur(e))
     }
@@ -75,12 +90,14 @@ export default function Menu({ compte }: { compte: Compte }) {
     setErreurNom(null)
     setErreur(null)
     setConfirmation(null)
+    setAvertissement(null)
   }
 
   /** Exécute une modification, puis relit le menu ; garde le formulaire ouvert en cas d'erreur. */
   async function executer(modification: () => Promise<void>, message: string) {
     setEnCours(true)
     setErreur(null)
+    setAvertissement(null)
     try {
       await modification()
       setAction(null)
@@ -132,6 +149,10 @@ export default function Menu({ compte }: { compte: Compte }) {
     )
   }
 
+  function supprimerPlat(plat: Plat) {
+    void executer(() => service.supprimerPlat(restaurant.id, plat), `« ${plat.nom} » est retiré du menu.`)
+  }
+
   const formulaireNom = (etiquette: string, libelleBouton: string) => (
     <form className="menu-formulaire" onSubmit={enregistrerNom} noValidate>
       <div className="champ">
@@ -174,13 +195,25 @@ export default function Menu({ compte }: { compte: Compte }) {
           <h1>Votre menu</h1>
           <p className="texte-doux">{resumeMenu(categories)}</p>
         </div>
-        <Bouton onClick={() => ouvrir({ type: 'creation' })} disabled={enCours || action?.type === 'creation'}>
-          Nouvelle catégorie
-        </Bouton>
+        <div className="actions">
+          <Bouton
+            variante="blanc"
+            onClick={() => ouvrir({ type: 'creation' })}
+            disabled={enCours || action?.type === 'creation'}
+          >
+            Nouvelle catégorie
+          </Bouton>
+          {categories.length > 0 && (
+            <Link to="/menu/plats/nouveau" className="bouton bouton-bleu">
+              + Ajouter un plat
+            </Link>
+          )}
+        </div>
       </div>
 
       {erreur && <MessageErreur>{erreur}</MessageErreur>}
       {confirmation && <MessageInfo>{confirmation}</MessageInfo>}
+      {avertissement && <MessageErreur>{avertissement}</MessageErreur>}
 
       {action?.type === 'creation' && (
         <section className="carte menu-carte" aria-label="Nouvelle catégorie">
@@ -274,9 +307,73 @@ export default function Menu({ compte }: { compte: Compte }) {
         )}
       </section>
 
-      <p className="message message-note">
-        L'ajout des plats (nom, prix, photo) arrive avec la prochaine version de l'espace restaurant.
-      </p>
+      {categories.map((c) => {
+        const platsCategorie = plats.filter((p) => p.categorieId === c.id)
+        return (
+          <section key={c.id} className="carte menu-carte" aria-labelledby={`categorie-${c.id}`}>
+            <div className="barre">
+              <h2 id={`categorie-${c.id}`}>{c.nom}</h2>
+              <Link to={`/menu/plats/nouveau?categorie=${c.id}`} className="lien-fichier" aria-label={`Ajouter un plat dans ${c.nom}`}>
+                + Ajouter un plat
+              </Link>
+            </div>
+            {platsCategorie.length === 0 ? (
+              <p className="texte-doux">Aucun plat dans cette catégorie.</p>
+            ) : (
+              <ul className="menu-liste">
+                {platsCategorie.map((p) => (
+                  <li key={p.id} className="menu-ligne">
+                    <article className="plat" aria-label={p.nom}>
+                      <div className="plat-vignette">{p.imageUrl && <img src={p.imageUrl} alt="" />}</div>
+                      <div className="plat-texte">
+                        <div className="plat-nom">{p.nom}</div>
+                        {p.description && <div className="plat-description">{p.description}</div>}
+                      </div>
+                      <div className="plat-prix">{formaterPrix(p.prix)}</div>
+                      <span className="menu-boutons">
+                        <Link
+                          to={`/menu/plats/${p.id}`}
+                          className="bouton-icone"
+                          aria-label={`Modifier ${p.nom}`}
+                          title={`Modifier ${p.nom}`}
+                        >
+                          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M4 20h4L19 9l-4-4L4 16z" />
+                            <path d="M13 7l4 4" />
+                          </svg>
+                        </Link>
+                        <BoutonIcone
+                          libelle={`Supprimer ${p.nom}`}
+                          danger
+                          disabled={enCours}
+                          onClick={() => ouvrir({ type: 'suppressionPlat', id: p.id })}
+                        >
+                          <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
+                        </BoutonIcone>
+                      </span>
+                    </article>
+                    {action?.type === 'suppressionPlat' && action.id === p.id && (
+                      <div className="menu-confirmation" role="alertdialog" aria-label={`Supprimer ${p.nom} ?`}>
+                        <p>
+                          Retirer « {p.nom} » du menu ? Les clients ne le verront plus. Cette action est définitive.
+                        </p>
+                        <div className="actions">
+                          <Bouton type="button" variante="blanc" className="bouton-petit" disabled={enCours} onClick={() => ouvrir(null)}>
+                            Annuler
+                          </Bouton>
+                          <Bouton type="button" variante="harissa" className="bouton-petit" enCours={enCours} onClick={() => supprimerPlat(p)}>
+                            Supprimer le plat
+                          </Bouton>
+                        </div>
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        )
+      })}
     </Cadre>
   )
 }

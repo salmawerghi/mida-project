@@ -1,6 +1,7 @@
 /** Opérations de compte utilisées par les écrans (remplaçables dans les tests). */
 
 import type { CategorieMenu } from '../menu/categories'
+import type { InfosPlat, Plat } from '../menu/plats'
 import type { Horaire } from '../profil/horaires'
 
 export type EtatRestaurant = 'en_attente' | 'actif' | 'rejete' | 'bloque'
@@ -101,6 +102,21 @@ export interface ServiceRestaurant {
   ordonnerCategoriesMenu(restaurantId: string, categories: CategorieMenu[]): Promise<void>
   /** Supprime la catégorie et tous ses plats. */
   supprimerCategorieMenu(categorieId: string): Promise<void>
+
+  /** Plats du restaurant, triés par nom (US10). */
+  platsMenu(restaurantId: string): Promise<Plat[]>
+  /**
+   * Crée ou modifie un plat (`platId` absent : création), puis envoie la
+   * photo si elle est fournie. Renvoie le plat enregistré.
+   */
+  enregistrerPlat(restaurantId: string, platId: string | null, infos: InfosPlat, photo: File | null): Promise<ResultatPlat>
+  supprimerPlat(restaurantId: string, plat: Plat): Promise<void>
+}
+
+export interface ResultatPlat {
+  plat: Plat
+  /** Le plat est enregistré mais sa photo n'a pas pu être envoyée (message à afficher). */
+  erreurPhoto: string | null
 }
 
 /** Seuls les comptes « responsable » non bloqués utilisent l'espace restaurant. */

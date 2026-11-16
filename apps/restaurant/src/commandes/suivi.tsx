@@ -25,6 +25,9 @@ interface ValeurCommandes {
   /** Le navigateur bloque le son tant que la page n'a reçu aucun clic. */
   sonBloque: boolean
   changerSon: (actif: boolean) => void
+  /** Numéros des commandes annulées par le client depuis l'ouverture de la page (US21), `null` si inconnu. */
+  annulations: (number | null)[]
+  effacerAnnulations: () => void
 }
 
 const inactif: ValeurCommandes = {
@@ -38,6 +41,8 @@ const inactif: ValeurCommandes = {
   son: false,
   sonBloque: false,
   changerSon: () => {},
+  annulations: [],
+  effacerAnnulations: () => {},
 }
 
 const ContexteCommandes = createContext<ValeurCommandes>(inactif)
@@ -79,6 +84,13 @@ function SuiviActif({
   useEffect(() => {
     sonRef.current = son
   }, [son])
+  const [annulations, setAnnulations] = useState<(number | null)[]>([])
+  // numéro de chaque commande déjà vue : une commande annulée quitte la liste,
+  // mais l'alerte doit encore pouvoir citer son numéro
+  const numerosRef = useRef(new Map<string, number>())
+  useEffect(() => {
+    for (const c of commandes ?? []) numerosRef.current.set(c.id, c.numero)
+  }, [commandes])
 
   const recharger = useCallback(async () => {
     try {
@@ -105,6 +117,11 @@ function SuiviActif({
           const id = evenement.id
           setNouvelles((liste) => (liste.includes(id) ? liste : [...liste, id]))
           if (sonRef.current) setSonBloque(!alerte.jouer())
+        }
+        if (evenement.type === 'UPDATE' && evenement.etat === 'annulee' && evenement.id) {
+          const id = evenement.id
+          setAnnulations((liste) => [...liste, numerosRef.current.get(id) ?? null])
+          setNouvelles((liste) => liste.filter((x) => x !== id))
         }
         relireBientot()
       },
@@ -156,9 +173,24 @@ function SuiviActif({
     [alerte],
   )
 
+  const effacerAnnulations = useCallback(() => setAnnulations([]), [])
+
   const valeur = useMemo<ValeurCommandes>(
-    () => ({ actif: true, commandes, erreur, aTraiter, nouvelles, marquerVues, recharger, son, sonBloque, changerSon }),
-    [commandes, erreur, aTraiter, nouvelles, marquerVues, recharger, son, sonBloque, changerSon],
+    () => ({
+      actif: true,
+      commandes,
+      erreur,
+      aTraiter,
+      nouvelles,
+      marquerVues,
+      recharger,
+      son,
+      sonBloque,
+      changerSon,
+      annulations,
+      effacerAnnulations,
+    }),
+    [commandes, erreur, aTraiter, nouvelles, marquerVues, recharger, son, sonBloque, changerSon, annulations, effacerAnnulations],
   )
   return <ContexteCommandes.Provider value={valeur}>{children}</ContexteCommandes.Provider>
 }

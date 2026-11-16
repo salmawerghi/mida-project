@@ -1399,3 +1399,23 @@ textarea.saisie {
   background: var(--dore-clair);
   color: #6b4a00;
 }
+
+/* ---------- Commande annulée par le client (US21) ---------- */
+.alerte-annulation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px 18px;
+  border-radius: 18px;
+  background: var(--dore-clair);
+  color: #6b4a00;
+  font-weight: 600;
+  box-shadow: 0 5px 0 #e8c46a;
+}
+.alerte-annulation ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}

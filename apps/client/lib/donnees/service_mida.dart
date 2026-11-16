@@ -35,6 +35,9 @@ abstract class ServiceMida {
   /// Appelle [rappel] à chaque changement de la commande (temps réel), et à
   /// chaque (re)connexion. Renvoie de quoi se désabonner.
   void Function() surCommande(String id, void Function() rappel);
+
+  /// Annule la commande tant que le restaurant ne l'a pas acceptée (US21).
+  Future<void> annulerCommande(String id);
 }
 
 class ServiceMidaSupabase implements ServiceMida {
@@ -148,5 +151,11 @@ class ServiceMidaSupabase implements ServiceMida {
       if (statut == RealtimeSubscribeStatus.subscribed) rappel();
     });
     return () => _client.removeChannel(canal);
+  }
+
+  @override
+  Future<void> annulerCommande(String id) async {
+    // Fonction de la base (migration US21) : seulement le client, seulement « en attente ».
+    await _client.rpc('annuler_commande', params: {'p_commande': id});
   }
 }

@@ -68,6 +68,9 @@ export default function Cadre({ compte, children }: { compte: Compte; children: 
         </div>
       </aside>
       <main className="cadre-contenu">
+        {suivi.annulations.length > 0 && (
+          <AlerteAnnulations numeros={suivi.annulations} onFermer={suivi.effacerAnnulations} />
+        )}
         {suivi.nouvelles.length > 0 && !surCommandes && <AlerteNouvelles nombre={suivi.nouvelles.length} />}
         {children}
       </main>
@@ -83,6 +86,23 @@ function AlerteNouvelles({ nombre }: { nombre: number }) {
       <Link to="/commandes" className="bouton bouton-blanc bouton-petit">
         Voir les commandes
       </Link>
+    </div>
+  )
+}
+
+/** Commande annulée par le client avant son acceptation (US21), sur toutes les pages. */
+function AlerteAnnulations({ numeros, onFermer }: { numeros: (number | null)[]; onFermer: () => void }) {
+  const libelles = numeros.map((n) => (n === null ? 'Une commande' : `La commande n° ${n}`))
+  return (
+    <div className="alerte-annulation" role="alert">
+      <ul>
+        {libelles.map((l, i) => (
+          <li key={i}>{l} a été annulée par le client.</li>
+        ))}
+      </ul>
+      <button type="button" className="bouton bouton-blanc bouton-petit" onClick={onFermer}>
+        Compris
+      </button>
     </div>
   )
 }

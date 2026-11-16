@@ -84,6 +84,17 @@ class FauxServiceMida implements ServiceMida {
     return () => _abonnes[id]?.remove(rappel);
   }
 
+  /// Levée par `annulerCommande` (refus du serveur : déjà acceptée…).
+  Object? erreurAnnulation;
+  final annulations = <String>[];
+
+  @override
+  Future<void> annulerCommande(String id) async {
+    annulations.add(id);
+    if (erreurAnnulation != null) throw erreurAnnulation!;
+    simulerChangement(avecEtat(suivies[id]!, EtatCommande.annulee, annuleeLe: DateTime(2026, 11, 16, 19, 3)));
+  }
+
   /// Simule un changement fait par le restaurant (événement temps réel).
   void simulerChangement(CommandeClient c) {
     suivies[c.id] = c;

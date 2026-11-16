@@ -1090,3 +1090,55 @@ test('US19 · seul un compte client passe commande ; jamais directement dans la 
     await assert.rejects(passer([{ plat_id: P_AGNEAU, quantite: 1 }]), /compte est bloqué/);
   }, `update public.profiles set etat_compte = 'bloque' where email = 'amine@mida.test'`);
 });
+
+// =====================================================================
+// US21 — annuler sa commande tant qu'elle n'est pas acceptée
+// =====================================================================
+const annuler = (id) => requete(`select public.annuler_commande($1)`, [id]);
+
+test('US21 · le client annule sa commande en attente, le restaurant est prévenu', async () => {
+  await en('youssef', async () => {
+    await annuler(C_1045);
+    const [c] = await lignes(`select etat::text, annulee_le is not null as datee from public.commandes where id = $1`, [C_1045]);
+    assert.deepEqual(c, { etat: 'annulee', datee: true });
+    await assert.rejects(annuler(C_1045), /n° 1045 est déjà annulée/);
+    // le restaurant ne peut plus l'accepter
+    await db.exec('reset role');
+    await db.query("select set_config('request.jwt.claim.sub', $1, true)", [ids.zitouna]);
+    await db.exec('set local role authenticated');
+    assert.deepEqual(await lignes(`select etat::text from public.commandes where id = $1`, [C_1045]), [{ etat: 'annulee' }]);
+    await assert.rejects(requete(`select public.accepter_commande($1)`, [C_1045]), /déjà été traitée/);
+    const [n] = await lignes(`select titre, message from public.notifications where commande_id = $1 and titre = 'Commande annulée'`, [C_1045]);
+    assert.equal(n.message, 'Le client a annulé la commande n° 1045 avant son acceptation.');
+  });
+});
+
+test('US21 · annulation impossible une fois acceptée, et seulement par son client', async () => {
+  await en('zitouna', async () => {
+    await requete(`select public.accepter_commande($1)`, [C_1045]);
+    await db.exec('reset role');
+    await db.query("select set_config('request.jwt.claim.sub', $1, true)", [ids.youssef]);
+    await db.exec('set local role authenticated');
+    await assert.rejects(annuler(C_1045), /ne peut plus être annulée : le restaurant l'a déjà acceptée/);
+    assert.equal((await etatDe(C_1045)).etat, 'acceptee');
+  });
+  for (const qui of ['amine', 'zitouna']) {
+    await en(qui, async () => {
+      await assert.rejects(annuler(C_1045), /Commande introuvable/);
+    });
+  }
+  await en(null, async () => {
+    await assert.rejects(annuler(C_1045), /permission denied/);
+  });
+  await en('leila', async () => {
+    // sa commande 1043 a été refusée par El Kanoun : plus rien à annuler
+    await assert.rejects(annuler('60000000-0000-4000-8000-000000001043'), /n° 1043 a déjà été refusée par le restaurant/);
+  });
+});
+
+test('US21 · une commande payée par carte et annulée est remboursée', async () => {
+  await en('amine', async () => {
+    await annuler(C_TEST);
+    assert.deepEqual(await lignes(`select etat::text from public.paiements where commande_id = $1`, [C_TEST]), [{ etat: 'rembourse' }]);
+  }, COMMANDE_CARTE);
+});

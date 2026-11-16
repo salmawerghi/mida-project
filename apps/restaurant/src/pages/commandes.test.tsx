@@ -1,4 +1,4 @@
-import { act, render, screen, within } from '@testing-library/react'
+import { act, render, screen, waitFor, waitForElementToBeRemoved, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
@@ -346,5 +346,38 @@ describe('en préparation, puis prête (US14)', () => {
 
     await u.click(await screen.findByRole('button', { name: 'Marquer comme prête : commande n° 1044' }))
     expect(await screen.findByText('La commande n° 1044 est déjà prête')).toBeInTheDocument()
+  })
+})
+
+describe('commande annulée par le client (US21)', () => {
+  it('le restaurant voit l’annulation : alerte avec le numéro, la commande quitte la liste', async () => {
+    const u = userEvent.setup()
+    const service = new FauxService(valide)
+    const lecteur = ouvrir(service)
+    await screen.findByRole('article', { name: 'Commande n° 1045' })
+
+    act(() => service.simulerChangement('k1045', 'annulee'))
+
+    const alerte = await screen.findByRole('alert')
+    expect(alerte).toHaveTextContent('La commande n° 1045 a été annulée par le client.')
+    await waitForElementToBeRemoved(() => screen.queryByRole('article', { name: 'Commande n° 1045' }), { timeout: 3000 })
+    expect(screen.queryByText('1 nouvelle commande à traiter')).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Commandes' })).toBeInTheDocument()
+    expect(lecteur.jouer).not.toHaveBeenCalled()
+
+    await u.click(within(alerte).getByRole('button', { name: 'Compris' }))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('aussi sur les autres pages', async () => {
+    const service = new FauxService(valide)
+    ouvrir(service, '/menu')
+    await screen.findByRole('region', { name: 'Catégories du menu' })
+    await waitFor(() => expect(service.commandesEnCours).toHaveBeenCalled())
+    // laisser la liste se charger pour connaître le numéro
+    await screen.findByRole('link', { name: 'Commandes, 1 à traiter' })
+
+    act(() => service.simulerChangement('k1045', 'annulee'))
+    expect(await screen.findByRole('alert')).toHaveTextContent('La commande n° 1045 a été annulée par le client.')
   })
 })

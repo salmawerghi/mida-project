@@ -22,7 +22,8 @@ class SuiviPage extends StatefulWidget {
 
 class _SuiviPageState extends State<SuiviPage> {
   CommandeClient? _commande;
-  String? _erreur;
+  String? _erreur; // action refusée (annulation…)
+  String? _erreurChargement;
   void Function()? _desabonner;
   Timer? _relecture;
 
@@ -53,11 +54,48 @@ class _SuiviPageState extends State<SuiviPage> {
       if (mounted) {
         setState(() {
           _commande = c;
-          _erreur = null;
+          _erreurChargement = null;
         });
       }
     } catch (e) {
+      if (mounted) setState(() => _erreurChargement = messageErreur(e));
+    }
+  }
+
+  bool _annulationEnCours = false;
+
+  /// Annulation (US21) : seulement tant que le restaurant n'a pas accepté, après confirmation.
+  Future<void> _annuler(CommandeClient c) async {
+    final confirme = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Annuler la commande n° ${c.numero} ?'),
+        content: Text('${c.restaurantNom} ne l\'a pas encore acceptée : elle sera annulée et le restaurant prévenu.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Garder ma commande')),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Couleurs.harissa),
+            child: const Text('Annuler la commande'),
+          ),
+        ],
+      ),
+    );
+    if (confirme != true || !mounted) return;
+    final mida = Dependances.of(context).mida;
+    setState(() {
+      _annulationEnCours = true;
+      _erreur = null;
+    });
+    try {
+      await mida.annulerCommande(c.id);
+    } catch (e) {
+      // par exemple : le restaurant vient de l'accepter
       if (mounted) setState(() => _erreur = messageErreur(e));
+    } finally {
+      if (mounted) setState(() => _annulationEnCours = false);
+      // relecture directe, sans attendre l'événement temps réel
+      await _charger();
     }
   }
 
@@ -72,11 +110,11 @@ class _SuiviPageState extends State<SuiviPage> {
       ),
       body: c == null
           ? Center(
-              child: _erreur != null
+              child: _erreurChargement != null
                   ? Padding(
                       padding: const EdgeInsets.all(24),
                       child: Column(mainAxisSize: MainAxisSize.min, children: [
-                        MessageErreur(_erreur!),
+                        MessageErreur(_erreurChargement!),
                         TextButton(onPressed: _charger, child: const Text('Réessayer')),
                       ]),
                     )
@@ -101,6 +139,25 @@ class _SuiviPageState extends State<SuiviPage> {
                   else
                     _Etapes(commande: c),
                   if (_erreur != null) ...[const SizedBox(height: 12), MessageErreur(_erreur!)],
+                  if (c.etat == EtatCommande.enAttente) ...[
+                    const SizedBox(height: 16),
+                    OutlinedButton.icon(
+                      onPressed: _annulationEnCours ? null : () => _annuler(c),
+                      icon: const Icon(Icons.close_rounded),
+                      label: const Text('Annuler la commande'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Couleurs.harissa,
+                        side: const BorderSide(color: Couleurs.harissa, width: 2),
+                        minimumSize: const Size.fromHeight(48),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Possible tant que le restaurant n\'a pas accepté votre commande.',
+                      style: textes.bodyMedium?.copyWith(fontSize: 12),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
                   const SizedBox(height: 20),
                   _Detail(commande: c),
                 ],

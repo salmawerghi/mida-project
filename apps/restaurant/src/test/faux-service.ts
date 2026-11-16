@@ -10,7 +10,7 @@ import type {
   ResultatPlat,
   ServiceRestaurant,
 } from '../auth/service'
-import type { Commande, EtatCommande, EvenementCommande } from '../commandes/commandes'
+import { etatsEnCours, type Commande, type EtatCommande, type EvenementCommande } from '../commandes/commandes'
 import type { CategorieMenu } from '../menu/categories'
 import type { InfosPlat, Plat } from '../menu/plats'
 import { horairesParDefaut, type Horaire } from '../profil/horaires'
@@ -156,7 +156,8 @@ export class FauxService implements ServiceRestaurant {
 
   commandesEnCours = vi.fn(async (_restaurant: string) => {
     if (this.erreurCommandes) throw this.erreurCommandes
-    return [...this.commandes]
+    // comme le vrai service : seulement les commandes en cours
+    return this.commandes.filter((c) => etatsEnCours.includes(c.etat))
   })
 
   surCommandes = vi.fn((_restaurant: string, rappel: (e: EvenementCommande) => void, surConnexion: () => void) => {

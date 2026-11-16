@@ -7,6 +7,7 @@ import 'package:mida_client/pages/suivi_page.dart';
 import 'faux_service_auth.dart';
 import 'faux_service_mida.dart';
 import 'outils.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Laisse passer la relecture différée (300 ms) qui suit un événement temps réel.
 Future<void> recevoir(WidgetTester tester) async {
@@ -133,6 +134,59 @@ void main() {
       final mida = FauxServiceMida()..suivies['cmd1'] = commandeTest;
       await ouvrirPage(tester, AccueilPage(auth: FauxServiceAuth(), visiteur: true), mida: mida);
       expect(find.textContaining('Commande n°'), findsNothing);
+    });
+  });
+
+  group('annuler sa commande (US21)', () {
+    Future<void> toucherAnnuler(WidgetTester tester) async {
+      final bouton = find.widgetWithText(OutlinedButton, 'Annuler la commande');
+      await tester.ensureVisible(bouton);
+      await tester.pumpAndSettle();
+      await tester.tap(bouton);
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('en attente : annulation après confirmation, l\'état devient « annulée »', (tester) async {
+      final mida = FauxServiceMida()..suivies['cmd1'] = commandeTest;
+      await ouvrirPage(tester, const SuiviPage(commandeId: 'cmd1'), mida: mida);
+
+      await toucherAnnuler(tester);
+      expect(find.text('Annuler la commande n° 1047 ?'), findsOneWidget);
+      await tester.tap(find.text('Garder ma commande'));
+      await tester.pumpAndSettle();
+      expect(mida.annulations, isEmpty);
+
+      await toucherAnnuler(tester);
+      await tester.tap(find.widgetWithText(TextButton, 'Annuler la commande'));
+      await recevoir(tester);
+      expect(mida.annulations, ['cmd1']);
+      expect(find.text('Commande annulée'), findsOneWidget);
+      expect(find.textContaining('Vous avez annulé cette commande à 19:03'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, 'Annuler la commande'), findsNothing);
+    });
+
+    testWidgets('plus de bouton une fois la commande acceptée', (tester) async {
+      final mida = FauxServiceMida()..suivies['cmd1'] = commandeTest;
+      await ouvrirPage(tester, const SuiviPage(commandeId: 'cmd1'), mida: mida);
+      expect(find.widgetWithText(OutlinedButton, 'Annuler la commande'), findsOneWidget);
+
+      mida.simulerChangement(avecEtat(commandeTest, EtatCommande.acceptee, accepteeLe: DateTime(2026, 11, 16, 19, 2)));
+      await recevoir(tester);
+      expect(find.widgetWithText(OutlinedButton, 'Annuler la commande'), findsNothing);
+    });
+
+    testWidgets('acceptée entre-temps : le refus du serveur est affiché', (tester) async {
+      final mida = FauxServiceMida()
+        ..suivies['cmd1'] = commandeTest
+        ..erreurAnnulation = const PostgrestException(
+          message: 'La commande n° 1047 ne peut plus être annulée : le restaurant l\'a déjà acceptée',
+          code: 'P0001',
+        );
+      await ouvrirPage(tester, const SuiviPage(commandeId: 'cmd1'), mida: mida);
+      await toucherAnnuler(tester);
+      await tester.tap(find.widgetWithText(TextButton, 'Annuler la commande'));
+      await tester.pumpAndSettle();
+      expect(find.text('La commande n° 1047 ne peut plus être annulée : le restaurant l\'a déjà acceptée'), findsOneWidget);
     });
   });
 }

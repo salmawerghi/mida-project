@@ -43,8 +43,9 @@ apps/
 | US18 | Panier (appli client) : ajouter des plats depuis le menu, modifier les quantités (1 à 20), retirer, vider ; total à jour ; un seul restaurant par panier (proposition de vider sinon) ; conservé en quittant l'écran | codé : 7 tests Flutter ; essai réel à faire |
 | US19 | Valider la commande (appli client) : adresse de livraison obligatoire, remarque, paiement en espèces, récapitulatif sous-total / frais / total ; total calculé par le serveur ; la commande arrive au restaurant « en attente » ; un visiteur se connecte d'abord, panier gardé | codé : 7 tests Flutter + 3 tests PGlite, fonction appliquée sur Supabase ; essai réel à faire |
 | US20 | Suivi de la commande en temps réel (appli client) : étapes franchies avec leur heure, mise à jour sans action du client, motif affiché si la commande est refusée (et remboursement) ; accès depuis l'accueil | codé : 8 tests Flutter ; essai réel à faire |
+| US21 | Annuler sa commande (appli client) tant qu'elle est « en attente », avec confirmation ; le restaurant voit l'annulation (alerte avec le numéro, la commande quitte la liste) et reçoit une notification | codé : 3 tests Flutter + 2 tests Vitest + 3 tests PGlite, fonction appliquée sur Supabase ; essai réel à faire |
 
-US01 à US03, US08, US09, US11 à US15 et US19 sont appliquées sur le projet Supabase de Mida (`tpfpuwlgnxhwhezicuto`) ; le jeu de test n'y est pas encore chargé.
+US01 à US03, US08, US09, US11 à US15, US19 et US21 sont appliquées sur le projet Supabase de Mida (`tpfpuwlgnxhwhezicuto`) ; le jeu de test n'y est pas encore chargé.
 
 ## Appliquer sur un projet Supabase
 
@@ -159,6 +160,12 @@ flutter run         # se connecte au projet Supabase de Mida (lib/config.dart)
 - **Temps réel** : abonnement Supabase Realtime à la commande (`onPostgresChanges` sur `commandes`, filtre `id = …` ; la table est dans la publication depuis US12, et la RLS ne laisse passer que les commandes du client). Chaque événement relit la commande (300 ms après le dernier), ainsi qu'à chaque (re)connexion ; l'abonnement est retiré en quittant l'écran. Tirer vers le bas relit aussi.
 - **Refusée** : « Dar Zitouna n'a pas pu accepter votre commande », le motif indiqué par le restaurant entre guillemets, et « … remboursés » si le paiement par carte a été remboursé (sinon « Vous n'avez rien payé »). Bouton « Trouver un autre restaurant ».
 - L'accueil d'un client connecté affiche ses **commandes en cours** (« Commande n° 1047 · Dar Zitouna — En préparation ») : un toucher ouvre le suivi, même après avoir fermé l'appli.
+
+### Annuler sa commande (US21)
+
+- Sur le suivi d'une commande **en attente**, le bouton « Annuler la commande » (« Possible tant que le restaurant n'a pas accepté votre commande ») demande confirmation (« Garder ma commande » / « Annuler la commande »). La commande passe à « Commande annulée » (« Vous avez annulé cette commande à 19:03. Le restaurant a été prévenu. »). Le bouton disparaît dès que le restaurant accepte (temps réel). Si le restaurant a accepté entre-temps, le refus du serveur s'affiche.
+- **Serveur** (migration `20261116000007`) : `annuler_commande(p_commande)` — seulement le **client** de la commande (sinon « Commande introuvable »), seulement à l'état `en_attente` (verrou de la ligne : une acceptation et une annulation simultanées ne passent pas toutes les deux). Elle met `etat = annulee` et `annulee_le`, rembourse un paiement par carte déjà encaissé, et crée la notification « Commande annulée » pour le restaurant.
+- **Espace restaurant** : l'événement temps réel « annulée » affiche, sur toutes les pages, « La commande n° 1045 a été annulée par le client. » (bouton « Compris ») ; la carte quitte la page Commandes et la pastille du menu se met à jour.
 
 - Les services sont fournis à tous les écrans par `Dependances.of(context)` (`lib/dependances.dart`) ; les tests utilisent `test/faux_service_mida.dart`.
 

@@ -24,8 +24,14 @@ class FauxServiceMida implements ServiceMida {
   @override
   Future<List<RestaurantCatalogue>> restaurants() => _repondre([..._restaurants]..sort(comparerRestaurants));
 
+  /// Les catégories ne se chargent pas (le catalogue doit rester utilisable).
+  bool erreurCategories = false;
+
   @override
-  Future<List<CategorieRestaurant>> categoriesRestaurant() => _repondre(categoriesTest);
+  Future<List<CategorieRestaurant>> categoriesRestaurant() async {
+    if (erreurCategories) throw Exception('catégories indisponibles');
+    return categoriesTest;
+  }
 }
 
 const categoriesTest = [

@@ -8,6 +8,14 @@ import 'faux_service_auth.dart';
 import 'faux_service_mida.dart';
 import 'outils.dart';
 
+/// Les puces de catégorie défilent horizontalement : on amène la puce à l'écran avant de la toucher.
+Future<void> toucherCategorie(WidgetTester tester, String nom) async {
+  final puce = find.widgetWithText(ChoiceChip, nom);
+  await tester.ensureVisible(puce);
+  await tester.pumpAndSettle();
+  await tester.tap(puce);
+}
+
 void main() {
   group('formats', () {
     test('prix en dinars, 3 décimales', () {
@@ -80,6 +88,65 @@ void main() {
       expect(find.text('Dar Zitouna'), findsOneWidget);
       await defilerJusqua(tester, find.text('J\'ai déjà un compte'));
       expect(find.text('Créer un compte'), findsOneWidget);
+    });
+  });
+
+  group('recherche et filtre par catégorie (US16)', () {
+    test('recherche sans tenir compte des majuscules ni des accents, par mots', () {
+      List<String> noms(String recherche, {String? categorie}) =>
+          filtrerRestaurants(catalogueTest, recherche: recherche, categorieId: categorie).map((r) => r.nom).toList();
+      expect(noms('zitou'), ['Dar Zitouna']);
+      expect(noms('BAB souïka'), ['Bab Souika']);
+      expect(noms('  '), hasLength(3));
+      expect(noms('couscous'), containsAll(['Dar Zitouna', 'Bab Souika'])); // nom de la catégorie
+      expect(noms('', categorie: 'k2'), ['El Kanoun']);
+      expect(noms('dar', categorie: 'k2'), isEmpty);
+    });
+
+    testWidgets('la recherche par nom filtre la liste au fil de la saisie', (tester) async {
+      await ouvrirPage(tester, AccueilPage(auth: FauxServiceAuth()));
+      await tester.enterText(find.byType(TextField), 'kanoun');
+      await tester.pump();
+      expect(find.text('El Kanoun'), findsOneWidget);
+      expect(find.text('Dar Zitouna'), findsNothing);
+
+      await tester.tap(find.byTooltip('Effacer la recherche'));
+      await tester.pump();
+      expect(find.text('Dar Zitouna'), findsOneWidget);
+    });
+
+    testWidgets('filtre par catégorie (seules les catégories utilisées sont proposées)', (tester) async {
+      await ouvrirPage(tester, AccueilPage(auth: FauxServiceAuth()));
+      expect(find.widgetWithText(ChoiceChip, 'Tous'), findsOneWidget);
+      expect(find.widgetWithText(ChoiceChip, 'Douceurs'), findsNothing); // aucun restaurant
+
+      await toucherCategorie(tester, 'Ojja et grillades');
+      await tester.pump();
+      expect(find.text('El Kanoun'), findsOneWidget);
+      expect(find.text('Dar Zitouna'), findsNothing);
+
+      await toucherCategorie(tester, 'Tous');
+      await tester.pump();
+      expect(find.bySemanticsLabel(RegExp(r'^Restaurant ')), findsNWidgets(3));
+    });
+
+    testWidgets('aucun résultat : message, et « Effacer les filtres » remet tout', (tester) async {
+      await ouvrirPage(tester, AccueilPage(auth: FauxServiceAuth()));
+      await toucherCategorie(tester, 'Ojja et grillades');
+      await tester.enterText(find.byType(TextField), 'pizza');
+      await tester.pump();
+      expect(find.text('Aucun restaurant ne correspond à « pizza ».'), findsOneWidget);
+
+      await tester.tap(find.text('Effacer les filtres'));
+      await tester.pump();
+      expect(find.bySemanticsLabel(RegExp(r'^Restaurant ')), findsNWidgets(3));
+      expect(find.text('pizza'), findsNothing);
+    });
+
+    testWidgets('sans les catégories (erreur), le catalogue reste utilisable', (tester) async {
+      await ouvrirPage(tester, AccueilPage(auth: FauxServiceAuth()), mida: FauxServiceMida()..erreurCategories = true);
+      expect(find.text('Dar Zitouna'), findsOneWidget);
+      expect(find.byType(ChoiceChip), findsNothing);
     });
   });
 }

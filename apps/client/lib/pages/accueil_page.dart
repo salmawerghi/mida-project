@@ -11,7 +11,7 @@ import 'connexion_page.dart';
 import 'inscription_page.dart';
 
 /// Accueil : le catalogue des restaurants (maquette « Client · Accueil »,
-/// US15). Ouvert aussi aux visiteurs sans compte : la connexion n'est
+/// US15), avec recherche par nom et filtre par catégorie (US16). Ouvert aussi aux visiteurs sans compte : la connexion n'est
 /// demandée qu'au moment de commander.
 class AccueilPage extends StatefulWidget {
   const AccueilPage({super.key, required this.auth, this.visiteur = false});
@@ -24,8 +24,22 @@ class AccueilPage extends StatefulWidget {
 
 class _AccueilPageState extends State<AccueilPage> {
   List<RestaurantCatalogue>? _restaurants;
+  List<CategorieRestaurant> _categories = const [];
   String? _erreur;
   bool _premierChargement = true;
+  final _recherche = TextEditingController();
+  String? _categorieId;
+
+  @override
+  void dispose() {
+    _recherche.dispose();
+    super.dispose();
+  }
+
+  void _effacerFiltres() {
+    _recherche.clear();
+    setState(() => _categorieId = null);
+  }
 
   @override
   void didChangeDependencies() {
@@ -41,7 +55,18 @@ class _AccueilPageState extends State<AccueilPage> {
     setState(() => _erreur = null);
     try {
       final restaurants = await mida.restaurants();
-      if (mounted) setState(() => _restaurants = restaurants);
+      // Le filtre par catégorie est un plus : sans lui, le catalogue reste utilisable.
+      final categories = await mida.categoriesRestaurant().catchError((_) => <CategorieRestaurant>[]);
+      if (mounted) {
+        setState(() {
+          _restaurants = restaurants;
+          // seules les catégories qui ont au moins un restaurant servent de filtre
+          _categories = [
+            for (final k in categories)
+              if (restaurants.any((r) => r.categorieId == k.id)) k,
+          ];
+        });
+      }
     } catch (e) {
       if (mounted) setState(() => _erreur = messageErreur(e));
     }
@@ -50,7 +75,10 @@ class _AccueilPageState extends State<AccueilPage> {
   @override
   Widget build(BuildContext context) {
     final textes = Theme.of(context).textTheme;
-    final restaurants = _restaurants;
+    final tous = _restaurants;
+    final restaurants =
+        tous == null ? null : filtrerRestaurants(tous, recherche: _recherche.text, categorieId: _categorieId);
+    final filtre = _recherche.text.trim().isNotEmpty || _categorieId != null;
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Couleurs.fond,
@@ -83,6 +111,43 @@ class _AccueilPageState extends State<AccueilPage> {
             ),
             const SizedBox(height: 4),
             Text('Qu\'est-ce qu\'on mange aujourd\'hui ?', style: textes.bodyMedium),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _recherche,
+              textInputAction: TextInputAction.search,
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                labelText: 'Rechercher un restaurant',
+                hintText: 'Dar Zitouna, couscous…',
+                prefixIcon: const Icon(Icons.search_rounded),
+                suffixIcon: _recherche.text.isEmpty
+                    ? null
+                    : IconButton(
+                        tooltip: 'Effacer la recherche',
+                        icon: const Icon(Icons.close_rounded),
+                        onPressed: () => setState(_recherche.clear),
+                      ),
+              ),
+            ),
+            if (_categories.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    for (final (id, nom) in [(null, 'Tous'), for (final k in _categories) (k.id, k.nom)])
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ChoiceChip(
+                          label: Text(nom),
+                          selected: _categorieId == id,
+                          onSelected: (_) => setState(() => _categorieId = id),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 20),
             Text('Restaurants', style: textes.headlineSmall?.copyWith(fontSize: 22)),
             const SizedBox(height: 12),
@@ -95,7 +160,18 @@ class _AccueilPageState extends State<AccueilPage> {
                 padding: EdgeInsets.all(32),
                 child: Center(child: CircularProgressIndicator(semanticsLabel: 'Chargement des restaurants')),
               )
-            else if (restaurants.isEmpty)
+            else if (restaurants.isEmpty && filtre) ...[
+              Text(
+                _recherche.text.trim().isEmpty
+                    ? 'Aucun restaurant dans cette catégorie pour le moment.'
+                    : 'Aucun restaurant ne correspond à « ${_recherche.text.trim()} ».',
+                style: textes.bodyMedium,
+              ),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(onPressed: _effacerFiltres, child: const Text('Effacer les filtres')),
+              ),
+            ] else if (restaurants.isEmpty)
               Text('Aucun restaurant pour le moment. Revenez bientôt !', style: textes.bodyMedium)
             else
               for (final r in restaurants) ...[

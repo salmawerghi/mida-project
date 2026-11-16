@@ -61,6 +61,34 @@ class RestaurantCatalogue {
   }
 }
 
+/// Texte comparable : minuscules, sans accents (« Bab Souïka » ≈ « bab souika »).
+String sansAccents(String texte) {
+  const avec = 'àâäáãåçéèêëíìîïñóòôöõúùûüýÿœæ';
+  const sans = 'aaaaaaceeeeiiiinooooouuuuyyoa';
+  final minuscules = texte.toLowerCase();
+  final tampon = StringBuffer();
+  for (final c in minuscules.split('')) {
+    final i = avec.indexOf(c);
+    tampon.write(i < 0 ? c : sans[i]);
+  }
+  return tampon.toString();
+}
+
+/// Recherche par nom et filtre par catégorie du catalogue (US16).
+List<RestaurantCatalogue> filtrerRestaurants(
+  List<RestaurantCatalogue> restaurants, {
+  String recherche = '',
+  String? categorieId,
+}) {
+  final mots = sansAccents(recherche).split(RegExp(r'\s+')).where((m) => m.isNotEmpty).toList();
+  return [
+    for (final r in restaurants)
+      if ((categorieId == null || r.categorieId == categorieId) &&
+          mots.every((m) => sansAccents('${r.nom} ${r.categorie ?? ''}').contains(m)))
+        r,
+  ];
+}
+
 /// Ordre du catalogue : restaurants ouverts d'abord, puis les mieux notés, puis par nom.
 int comparerRestaurants(RestaurantCatalogue a, RestaurantCatalogue b) {
   if (a.ouvert != b.ouvert) return a.ouvert ? -1 : 1;

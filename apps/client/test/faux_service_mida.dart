@@ -66,6 +66,32 @@ class FauxServiceMida implements ServiceMida {
     );
   }
 
+  /// Commandes du client (suivi, US20), par identifiant.
+  final suivies = <String, CommandeClient>{};
+  final _abonnes = <String, List<void Function()>>{};
+  int get nbAbonnes => _abonnes.values.fold(0, (n, l) => n + l.length);
+
+  @override
+  Future<CommandeClient> commande(String id) => _repondre(suivies[id]!);
+
+  @override
+  Future<List<CommandeClient>> commandesEnCours() async =>
+      [for (final c in suivies.values) if (c.etat.enCours) c];
+
+  @override
+  void Function() surCommande(String id, void Function() rappel) {
+    _abonnes.putIfAbsent(id, () => []).add(rappel);
+    return () => _abonnes[id]?.remove(rappel);
+  }
+
+  /// Simule un changement fait par le restaurant (événement temps réel).
+  void simulerChangement(CommandeClient c) {
+    suivies[c.id] = c;
+    for (final rappel in [...?_abonnes[c.id]]) {
+      rappel();
+    }
+  }
+
   /// Les catégories ne se chargent pas (le catalogue doit rester utilisable).
   bool erreurCategories = false;
 
@@ -91,6 +117,55 @@ const menuTest = MenuRestaurant(
   ],
   horaire: HoraireDuJour(ferme: false, ouverture: '11:00', fermeture: '23:00'),
 );
+
+/// Commande n° 1047 de test, en attente chez Dar Zitouna.
+final commandeTest = CommandeClient(
+  id: 'cmd1',
+  numero: 1047,
+  etat: EtatCommande.enAttente,
+  restaurantNom: 'Dar Zitouna',
+  adresse: '12, rue du Jasmin, La Marsa',
+  sousTotal: 23,
+  fraisLivraison: 2.5,
+  total: 25.5,
+  remarque: 'Sonner deux fois',
+  creeeLe: DateTime(2026, 11, 16, 19, 0),
+  lignes: const [
+    LigneCommande(nomPlat: 'Couscous à l’agneau', quantite: 1, prixUnitaire: 18),
+    LigneCommande(nomPlat: 'Thé à la menthe', quantite: 2, prixUnitaire: 2.5),
+  ],
+);
+
+/// Copie de [c] avec un autre état et d'autres dates (changements faits par le restaurant).
+CommandeClient avecEtat(
+  CommandeClient c,
+  EtatCommande etat, {
+  DateTime? accepteeLe,
+  DateTime? preteLe,
+  DateTime? annuleeLe,
+  String? motifRefus,
+  String paiementMode = 'especes',
+  String paiementEtat = 'en_attente',
+}) =>
+    CommandeClient(
+      id: c.id,
+      numero: c.numero,
+      etat: etat,
+      restaurantNom: c.restaurantNom,
+      adresse: c.adresse,
+      sousTotal: c.sousTotal,
+      fraisLivraison: c.fraisLivraison,
+      total: c.total,
+      remarque: c.remarque,
+      motifRefus: motifRefus,
+      creeeLe: c.creeeLe,
+      accepteeLe: accepteeLe,
+      preteLe: preteLe,
+      annuleeLe: annuleeLe,
+      lignes: c.lignes,
+      paiementMode: paiementMode,
+      paiementEtat: paiementEtat,
+    );
 
 const categoriesTest = [
   CategorieRestaurant(id: 'k1', nom: 'Couscous et tajines'),

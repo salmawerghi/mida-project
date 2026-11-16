@@ -165,6 +165,149 @@ class CommandePassee {
       );
 }
 
+/// États d'une commande (type `etat_commande` de la base).
+enum EtatCommande {
+  enAttente('en_attente', 'En attente du restaurant'),
+  acceptee('acceptee', 'Acceptée par le restaurant'),
+  enPreparation('en_preparation', 'En préparation'),
+  prete('prete', 'Prête'),
+  enLivraison('en_livraison', 'En cours de livraison'),
+  livree('livree', 'Livrée'),
+  refusee('refusee', 'Commande refusée'),
+  annulee('annulee', 'Commande annulée');
+
+  const EtatCommande(this.code, this.titre);
+  final String code;
+  final String titre;
+
+  static EtatCommande depuis(String code) => values.firstWhere((e) => e.code == code);
+
+  /// Commande encore en cours (ni livrée, ni refusée, ni annulée).
+  bool get enCours => !{livree, refusee, annulee}.contains(this);
+}
+
+class LigneCommande {
+  const LigneCommande({required this.nomPlat, required this.quantite, required this.prixUnitaire});
+  final String nomPlat;
+  final int quantite;
+  final double prixUnitaire;
+}
+
+/// Commande vue par le client (suivi, US20).
+class CommandeClient {
+  const CommandeClient({
+    required this.id,
+    required this.numero,
+    required this.etat,
+    required this.restaurantNom,
+    required this.adresse,
+    required this.sousTotal,
+    required this.fraisLivraison,
+    required this.total,
+    this.remarque,
+    this.motifRefus,
+    required this.creeeLe,
+    this.accepteeLe,
+    this.preteLe,
+    this.livreeLe,
+    this.annuleeLe,
+    this.lignes = const [],
+    this.paiementMode = 'especes',
+    this.paiementEtat = 'en_attente',
+  });
+
+  final String id;
+  final int numero;
+  final EtatCommande etat;
+  final String restaurantNom;
+  final String adresse;
+  final double sousTotal;
+  final double fraisLivraison;
+  final double total;
+  final String? remarque;
+  final String? motifRefus;
+  final DateTime creeeLe;
+  final DateTime? accepteeLe;
+  final DateTime? preteLe;
+  final DateTime? livreeLe;
+  final DateTime? annuleeLe;
+  final List<LigneCommande> lignes;
+  final String paiementMode;
+  final String paiementEtat;
+
+  bool get rembourse => paiementMode == 'carte' && paiementEtat == 'rembourse';
+
+  /// Colonnes lues par l'appli (avec le nom du restaurant, les lignes et le paiement).
+  static const colonnes = 'id, numero, etat, adresse_livraison, sous_total, frais_livraison, total, remarque, '
+      'motif_refus, created_at, acceptee_le, prete_le, livree_le, annulee_le, '
+      'restaurants(nom), lignes_commande(nom_plat, quantite, prix_unitaire), paiements(mode, etat)';
+
+  factory CommandeClient.depuis(Map<String, dynamic> l) {
+    DateTime? date(Object? v) => v == null ? null : DateTime.parse(v as String);
+    Object? premier(Object? v) => v is List ? (v.isEmpty ? null : v.first) : v;
+    final restaurant = premier(l['restaurants']) as Map?;
+    final paiement = premier(l['paiements']) as Map?;
+    return CommandeClient(
+      id: l['id'] as String,
+      numero: (l['numero'] as num).toInt(),
+      etat: EtatCommande.depuis(l['etat'] as String),
+      restaurantNom: restaurant?['nom'] as String? ?? 'Restaurant',
+      adresse: l['adresse_livraison'] as String? ?? '',
+      sousTotal: lireNombre(l['sous_total']),
+      fraisLivraison: lireNombre(l['frais_livraison']),
+      total: lireNombre(l['total']),
+      remarque: l['remarque'] as String?,
+      motifRefus: l['motif_refus'] as String?,
+      creeeLe: date(l['created_at'])!,
+      accepteeLe: date(l['acceptee_le']),
+      preteLe: date(l['prete_le']),
+      livreeLe: date(l['livree_le']),
+      annuleeLe: date(l['annulee_le']),
+      lignes: [
+        for (final x in (l['lignes_commande'] as List? ?? const []))
+          LigneCommande(
+            nomPlat: x['nom_plat'] as String,
+            quantite: (x['quantite'] as num).toInt(),
+            prixUnitaire: lireNombre(x['prix_unitaire']),
+          ),
+      ],
+      paiementMode: paiement?['mode'] as String? ?? 'especes',
+      paiementEtat: paiement?['etat'] as String? ?? 'en_attente',
+    );
+  }
+}
+
+/// Une étape du suivi : son libellé, son heure (si connue), franchie ou non.
+typedef EtapeSuivi = ({String libelle, DateTime? heure, bool franchie, bool actuelle});
+
+/// Étapes affichées pour une commande en cours ou livrée (maquette « Client · Suivi »).
+List<EtapeSuivi> etapesSuivi(CommandeClient c) {
+  const ordre = [
+    EtatCommande.enAttente,
+    EtatCommande.acceptee,
+    EtatCommande.enPreparation,
+    EtatCommande.prete,
+    EtatCommande.enLivraison,
+    EtatCommande.livree,
+  ];
+  final rang = ordre.indexOf(c.etat);
+  final heures = <EtatCommande, DateTime?>{
+    EtatCommande.enAttente: c.creeeLe,
+    EtatCommande.acceptee: c.accepteeLe,
+    EtatCommande.prete: c.preteLe,
+    EtatCommande.livree: c.livreeLe,
+  };
+  return [
+    for (final (i, e) in ordre.indexed)
+      (
+        libelle: e == EtatCommande.enAttente ? 'Commande envoyée' : e.titre,
+        heure: i <= rang ? heures[e] : null,
+        franchie: i <= rang,
+        actuelle: i == rang,
+      ),
+  ];
+}
+
 /// Texte comparable : minuscules, sans accents (« Bab Souïka » ≈ « bab souika »).
 String sansAccents(String texte) {
   const avec = 'àâäáãåçéèêëíìîïñóòôöõúùûüýÿœæ';

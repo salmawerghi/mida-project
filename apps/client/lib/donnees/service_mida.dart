@@ -25,6 +25,16 @@ abstract class ServiceMida {
     required String adresse,
     String? remarque,
   });
+
+  /// Une commande du client connecté, avec son détail (US20).
+  Future<CommandeClient> commande(String id);
+
+  /// Commandes du client encore en cours (pour l'accès au suivi depuis l'accueil).
+  Future<List<CommandeClient>> commandesEnCours();
+
+  /// Appelle [rappel] à chaque changement de la commande (temps réel), et à
+  /// chaque (re)connexion. Renvoie de quoi se désabonner.
+  void Function() surCommande(String id, void Function() rappel);
 }
 
 class ServiceMidaSupabase implements ServiceMida {
@@ -100,5 +110,43 @@ class ServiceMidaSupabase implements ServiceMida {
       'p_remarque': remarque,
     });
     return CommandePassee.depuis(Map<String, dynamic>.from(r as Map));
+  }
+
+  @override
+  Future<CommandeClient> commande(String id) async {
+    final l = await _client.from('commandes').select(CommandeClient.colonnes).eq('id', id).single();
+    return CommandeClient.depuis(l);
+  }
+
+  @override
+  Future<List<CommandeClient>> commandesEnCours() async {
+    final id = _client.auth.currentUser?.id;
+    if (id == null) return const [];
+    final lignes = await _client
+        .from('commandes')
+        .select(CommandeClient.colonnes)
+        .eq('client_id', id)
+        .inFilter('etat', [for (final e in EtatCommande.values) if (e.enCours) e.code])
+        .order('created_at', ascending: false);
+    return [for (final l in lignes) CommandeClient.depuis(l)];
+  }
+
+  @override
+  void Function() surCommande(String id, void Function() rappel) {
+    // Supabase Realtime (publication d'US12) : la règle d'accès des commandes
+    // s'applique, le client ne reçoit que les siennes.
+    final canal = _client
+        .channel('commande-$id')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'commandes',
+          filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'id', value: id),
+          callback: (_) => rappel(),
+        )
+        .subscribe((statut, _) {
+      if (statut == RealtimeSubscribeStatus.subscribed) rappel();
+    });
+    return () => _client.removeChannel(canal);
   }
 }

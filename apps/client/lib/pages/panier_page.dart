@@ -10,6 +10,7 @@ import '../widgets/catalogue.dart';
 import '../widgets/composants.dart';
 import '../widgets/panier_widgets.dart';
 import 'connexion_requise_page.dart';
+import 'suivi_page.dart';
 
 /// Panier (maquette « Client · Panier ») : quantités modifiables et total à
 /// jour (US18), puis validation avec l'adresse de livraison et le paiement
@@ -17,7 +18,7 @@ import 'connexion_requise_page.dart';
 class PanierPage extends StatefulWidget {
   const PanierPage({super.key, this.apresCommande});
 
-  /// Appelé quand la commande est enregistrée (par défaut : retour à l'accueil, puis suivi).
+  /// Appelé quand la commande est enregistrée (par défaut : suivi de la commande, US20).
   final void Function(BuildContext context, CommandePassee commande)? apresCommande;
 
   @override
@@ -74,7 +75,7 @@ class _PanierPageState extends State<PanierPage> {
       );
       panier.vider();
       if (!mounted) return;
-      (widget.apresCommande ?? _retourAccueil)(context, commande);
+      (widget.apresCommande ?? _ouvrirSuivi)(context, commande);
     } catch (e) {
       if (mounted) setState(() => _erreur = messageErreur(e));
     } finally {
@@ -82,12 +83,11 @@ class _PanierPageState extends State<PanierPage> {
     }
   }
 
-  static void _retourAccueil(BuildContext context, CommandePassee commande) {
-    final messager = ScaffoldMessenger.of(context);
-    Navigator.of(context).popUntil((r) => r.isFirst);
-    messager.showSnackBar(SnackBar(
-      content: Text('Commande n° ${commande.numero} envoyée au restaurant (${formaterPrix(commande.total)}).'),
-    ));
+  /// Retour à l'accueil (le panier et le menu ne servent plus), puis suivi de la commande.
+  static void _ouvrirSuivi(BuildContext context, CommandePassee commande) {
+    final navigateur = Navigator.of(context);
+    navigateur.popUntil((r) => r.isFirst);
+    navigateur.push(MaterialPageRoute(builder: (_) => SuiviPage(commandeId: commande.id)));
   }
 
   @override

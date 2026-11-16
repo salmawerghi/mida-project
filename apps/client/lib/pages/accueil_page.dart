@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../auth/erreurs.dart';
 import '../auth/service_auth.dart';
 import '../dependances.dart';
+import '../donnees/format.dart';
 import '../donnees/modeles.dart';
 import '../theme.dart';
 import '../widgets/catalogue.dart';
@@ -11,6 +12,7 @@ import '../widgets/panier_widgets.dart';
 import 'connexion_page.dart';
 import 'inscription_page.dart';
 import 'restaurant_page.dart';
+import 'suivi_page.dart';
 
 /// Accueil : le catalogue des restaurants (maquette « Client · Accueil »,
 /// US15), avec recherche par nom et filtre par catégorie (US16). Ouvert aussi aux visiteurs sans compte : la connexion n'est
@@ -52,9 +54,29 @@ class _AccueilPageState extends State<AccueilPage> {
     }
   }
 
+  /// Commandes en cours du client connecté (accès rapide au suivi, US20).
+  List<CommandeClient> _enCours = const [];
+
+  Future<void> _chargerCommandes() async {
+    final d = Dependances.of(context);
+    if (widget.visiteur || d.auth.session == null) return;
+    try {
+      final commandes = await d.mida.commandesEnCours();
+      if (mounted) setState(() => _enCours = commandes);
+    } catch (_) {
+      // sans gravité : le catalogue reste utilisable
+    }
+  }
+
+  Future<void> _ouvrirSuivi(CommandeClient c) async {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => SuiviPage(commandeId: c.id)));
+    _chargerCommandes();
+  }
+
   Future<void> _charger() async {
     final mida = Dependances.of(context).mida;
     setState(() => _erreur = null);
+    _chargerCommandes();
     try {
       final restaurants = await mida.restaurants();
       // Le filtre par catégorie est un plus : sans lui, le catalogue reste utilisable.
@@ -113,6 +135,10 @@ class _AccueilPageState extends State<AccueilPage> {
               style: textes.headlineMedium,
             ),
             const SizedBox(height: 4),
+            for (final c in _enCours) ...[
+              const SizedBox(height: 12),
+              _CommandeEnCours(commande: c, onTap: () => _ouvrirSuivi(c)),
+            ],
             Text('Qu\'est-ce qu\'on mange aujourd\'hui ?', style: textes.bodyMedium),
             const SizedBox(height: 16),
             TextField(
@@ -208,6 +234,52 @@ class _AccueilPageState extends State<AccueilPage> {
               ),
             ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// « Commande n° 1047 · En préparation » : accès au suivi depuis l'accueil.
+class _CommandeEnCours extends StatelessWidget {
+  const _CommandeEnCours({required this.commande, required this.onTap});
+  final CommandeClient commande;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = commande;
+    return Material(
+      color: Couleurs.bleu,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              const Icon(Icons.delivery_dining_rounded, color: Colors.white, size: 30),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Commande n° ${c.numero} · ${c.restaurantNom}',
+                      style: const TextStyle(color: Colors.white, fontSize: 13),
+                    ),
+                    Text(
+                      c.etat.titre,
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16),
+                    ),
+                  ],
+                ),
+              ),
+              Text(formaterPrix(c.total), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+              const Icon(Icons.chevron_right_rounded, color: Colors.white),
+            ],
+          ),
         ),
       ),
     );

@@ -844,3 +844,92 @@ test('US12 · le restaurant lit le détail de ses commandes : plats, paiement, n
     assert.deepEqual(await lignes(detail, [1045]), []);
   });
 });
+
+// =====================================================================
+// US13 — accepter ou refuser une commande
+// =====================================================================
+const C_1043 = '60000000-0000-4000-8000-000000001043';           // refusée (El Kanoun)
+const C_1046 = '60000000-0000-4000-8000-000000001046';           // en livraison (El Kanoun)
+const C_TEST = '61000000-0000-4000-8000-000000000001';
+// commande en attente payée par carte (Amine chez Dar Zitouna)
+const COMMANDE_CARTE = `
+  insert into public.commandes (id, numero, client_id, restaurant_id, adresse_livraison, etat, sous_total, frais_livraison, total)
+  values ('${C_TEST}', 1100, '${'c0000000-0000-4000-8000-000000000001'}', '${'10000000-0000-4000-8000-000000000001'}',
+          '12, rue du Jasmin, La Marsa', 'en_attente', 20, 2.5, 22.5);
+  insert into public.paiements (commande_id, mode, montant, etat, reference_passerelle, paye_le)
+  values ('${C_TEST}', 'carte', 22.5, 'paye', 'pi_test_1100', now());`;
+const etatDe = async (id) => (await lignes(`select etat::text, motif_refus from public.commandes where id = $1`, [id]))[0];
+
+test('US13 · le responsable accepte une commande en attente, le client est prévenu', async () => {
+  await en('zitouna', async () => {
+    await requete(`select public.accepter_commande($1)`, [C_1045]);
+    const [c] = await lignes(`select etat::text, acceptee_le is not null as datee from public.commandes where id = $1`, [C_1045]);
+    assert.deepEqual(c, { etat: 'acceptee', datee: true });
+    // une seule décision : ni réaccepter, ni refuser ensuite
+    await assert.rejects(requete(`select public.accepter_commande($1)`, [C_1045]), /n° 1045 a déjà été traitée/);
+    await assert.rejects(requete(`select public.refuser_commande($1, 'Trop tard')`, [C_1045]), /déjà été traitée/);
+    // la notification du client est créée, mais le responsable ne la lit pas
+    assert.deepEqual(await lignes(`select id from public.notifications where commande_id = $1 and titre = 'Commande acceptée'`, [C_1045]), []);
+    await db.exec('reset role');
+    await db.query("select set_config('request.jwt.claim.sub', $1, true)", [ids.youssef]);
+    await db.exec('set local role authenticated');
+    const notifs = await lignes(`select titre, message from public.notifications where commande_id = $1 and titre like 'Commande %'`, [C_1045]);
+    assert.equal(notifs.length, 1);
+    assert.equal(notifs[0].titre, 'Commande acceptée');
+    assert.match(notifs[0].message, /^Dar Zitouna a accepté votre commande n° 1045/);
+  });
+});
+
+test('US13 · refus : motif obligatoire, client prévenu avec le motif', async () => {
+  await en('zitouna', async () => {
+    for (const motif of [null, '', '   ']) {
+      await assert.rejects(requete(`select public.refuser_commande($1, $2)`, [C_1045, motif]), /motif du refus est obligatoire/);
+    }
+    assert.equal((await etatDe(C_1045)).etat, 'en_attente');
+    await requete(`select public.refuser_commande($1, $2)`, [C_1045, '  Un plat est épuisé — Plus de couscous ce soir  ']);
+    assert.deepEqual(await etatDe(C_1045), { etat: 'refusee', motif_refus: 'Un plat est épuisé — Plus de couscous ce soir' });
+    // paiement en espèces : rien à rembourser
+    assert.deepEqual(await lignes(`select etat::text from public.paiements where commande_id = $1`, [C_1045]), [{ etat: 'en_attente' }]);
+    await db.exec('reset role');
+    const [n] = await lignes(`select destinataire_id, titre, message from public.notifications
+                              where commande_id = $1 and titre = 'Commande refusée'`, [C_1045]);
+    assert.equal(n.destinataire_id, ids.youssef);
+    assert.equal(n.titre, 'Commande refusée');
+    assert.equal(n.message, 'Dar Zitouna ne peut pas préparer votre commande n° 1045. Motif : Un plat est épuisé — Plus de couscous ce soir.');
+  });
+});
+
+test('US13 · refus d\'une commande payée par carte : le paiement est remboursé', async () => {
+  await en('zitouna', async () => {
+    await requete(`select public.refuser_commande($1, 'Le restaurant ferme bientôt')`, [C_TEST]);
+    assert.deepEqual(await lignes(`select etat::text from public.paiements where commande_id = $1`, [C_TEST]), [{ etat: 'rembourse' }]);
+    await db.exec('reset role');
+    const [n] = await lignes(`select message from public.notifications where commande_id = $1 and titre = 'Commande refusée'`, [C_TEST]);
+    assert.match(n.message, /Vous allez être remboursé de 22,500 DT\.$/);
+  }, COMMANDE_CARTE);
+});
+
+test('US13 · seul le restaurant de la commande décide, et seulement tant qu\'elle est en attente', async () => {
+  await en('zitouna', async () => {
+    // commandes d'El Kanoun : refusées, quel que soit leur état
+    for (const id of [C_1043, C_1046]) {
+      await assert.rejects(requete(`select public.accepter_commande($1)`, [id]), /ne concerne pas votre restaurant/);
+    }
+    // commande inconnue
+    await assert.rejects(requete(`select public.accepter_commande($1)`, ['61000000-0000-4000-8000-0000000000ff']), /introuvable/);
+    // l'état ne se modifie toujours pas directement
+    assert.equal(await nbModifiees(`update public.commandes set etat = 'acceptee' where id = $1`, [C_1045]), 0);
+  });
+  await en('kanoun', async () => {
+    await assert.rejects(requete(`select public.accepter_commande($1)`, [C_1046]), /n° 1046 a déjà été traitée/);
+    await assert.rejects(requete(`select public.refuser_commande($1, 'x')`, [C_1043]), /déjà été traitée/);
+  });
+  // ni le client, ni un visiteur
+  await en('youssef', async () => {
+    await assert.rejects(requete(`select public.accepter_commande($1)`, [C_1045]), /ne concerne pas votre restaurant/);
+  });
+  await en(null, async () => {
+    await assert.rejects(requete(`select public.accepter_commande($1)`, [C_1045]), /permission denied/);
+  });
+  assert.equal((await etatDe(C_1045)).etat, 'en_attente');
+});

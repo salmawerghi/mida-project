@@ -57,6 +57,8 @@ export function messageErreur(erreur: unknown): string {
       }
       return "Ce compte n'a pas le droit de faire cette action."
     }
+    // Refus explicites des fonctions et déclencheurs de Mida : message déjà en français
+    if (code === 'P0001') return String((erreur as { message?: unknown }).message ?? '')
     if (code === '23514') return 'Une information est invalide. Vérifiez le formulaire.'
     if (code === '23503') return "Cette catégorie n'existe plus. Rechargez la page."
   }

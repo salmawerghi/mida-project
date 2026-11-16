@@ -200,3 +200,107 @@ describe('commandes en cours en temps réel (US12)', () => {
     expect(service.surCommandes).not.toHaveBeenCalled()
   })
 })
+
+describe('accepter ou refuser une commande (US13)', () => {
+  it('accepte une commande en un clic : elle passe en préparation, le client est prévenu', async () => {
+    const u = userEvent.setup()
+    const service = new FauxService(valide)
+    ouvrir(service)
+
+    await u.click(await screen.findByRole('button', { name: 'Accepter la commande n° 1045' }))
+
+    expect(
+      await screen.findByText('Commande n° 1045 acceptée : le client est prévenu. Elle passe en préparation.'),
+    ).toBeInTheDocument()
+    expect(service.accepterCommande).toHaveBeenCalledWith('k1045')
+    const preparation = screen.getByRole('region', { name: 'En préparation' })
+    expect(await within(preparation).findByRole('article', { name: 'Commande n° 1045' })).toBeInTheDocument()
+    // plus de boutons une fois la décision prise
+    expect(screen.queryByRole('button', { name: 'Accepter la commande n° 1045' })).not.toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'En attente' })).getByText('Aucune nouvelle commande.')).toBeInTheDocument()
+  })
+
+  it('pas de boutons Accepter / Refuser sur les commandes déjà acceptées', async () => {
+    ouvrir(new FauxService(valide))
+    const c1044 = await screen.findByRole('article', { name: 'Commande n° 1044' })
+    expect(within(c1044).queryByRole('button')).not.toBeInTheDocument()
+  })
+
+  it('refus : le motif est obligatoire, puis la commande quitte la page', async () => {
+    const u = userEvent.setup()
+    const service = new FauxService(valide)
+    ouvrir(service)
+
+    await u.click(await screen.findByRole('button', { name: 'Refuser la commande n° 1045' }))
+    const fenetre = screen.getByRole('dialog', { name: 'Refuser la commande n° 1045' })
+    expect(fenetre).toHaveTextContent('Youssef K. · 1 × Couscous à l’agneau, 2 × Thé à la menthe · 23,000 DT')
+    // payée par carte : le remboursement est annoncé
+    expect(within(fenetre).getByText('Le client a payé par carte : il sera remboursé de 23,000 DT.')).toBeInTheDocument()
+
+    await u.click(within(fenetre).getByRole('button', { name: 'Confirmer le refus' }))
+    expect(within(fenetre).getByText('Choisissez le motif du refus.')).toBeInTheDocument()
+    expect(service.refuserCommande).not.toHaveBeenCalled()
+
+    await u.click(within(fenetre).getByRole('radio', { name: 'Un plat est épuisé' }))
+    await u.type(within(fenetre).getByLabelText(/Message au client/), 'Plus de couscous ce soir.')
+    await u.click(within(fenetre).getByRole('button', { name: 'Confirmer le refus' }))
+
+    expect(await screen.findByText('Commande n° 1045 refusée : le client est prévenu et sera remboursé.')).toBeInTheDocument()
+    expect(service.refuserCommande).toHaveBeenCalledWith('k1045', 'Un plat est épuisé — Plus de couscous ce soir.')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.queryByRole('article', { name: 'Commande n° 1045' })).not.toBeInTheDocument()
+  })
+
+  it('« Autre motif » : le message au client devient obligatoire', async () => {
+    const u = userEvent.setup()
+    const service = new FauxService(valide)
+    service.commandes = service.commandes.map((c) =>
+      c.id === 'k1045' ? { ...c, paiement: { mode: 'especes', etat: 'en_attente' } } : c,
+    )
+    ouvrir(service)
+
+    await u.click(await screen.findByRole('button', { name: 'Refuser la commande n° 1045' }))
+    const fenetre = screen.getByRole('dialog')
+    expect(
+      within(fenetre).getByText("Le client a choisi le paiement en espèces : aucun remboursement n'est nécessaire."),
+    ).toBeInTheDocument()
+    await u.click(within(fenetre).getByRole('radio', { name: 'Autre motif' }))
+    await u.click(within(fenetre).getByRole('button', { name: 'Confirmer le refus' }))
+    expect(within(fenetre).getByText('Précisez le motif pour le client.')).toBeInTheDocument()
+
+    await u.type(within(fenetre).getByLabelText(/Message au client/), 'Coupure de gaz dans la cuisine')
+    await u.click(within(fenetre).getByRole('button', { name: 'Confirmer le refus' }))
+    expect(await screen.findByText('Commande n° 1045 refusée : le client est prévenu.')).toBeInTheDocument()
+    expect(service.refuserCommande).toHaveBeenCalledWith('k1045', 'Coupure de gaz dans la cuisine')
+  })
+
+  it('Annuler (ou Échap) ferme la fenêtre sans rien envoyer', async () => {
+    const u = userEvent.setup()
+    const service = new FauxService(valide)
+    ouvrir(service)
+
+    await u.click(await screen.findByRole('button', { name: 'Refuser la commande n° 1045' }))
+    await u.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Annuler' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+    await u.click(screen.getByRole('button', { name: 'Refuser la commande n° 1045' }))
+    await u.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(service.refuserCommande).not.toHaveBeenCalled()
+    expect(screen.getByRole('article', { name: 'Commande n° 1045' })).toBeInTheDocument()
+  })
+
+  it('commande déjà traitée ailleurs : message de la base, et la liste est relue', async () => {
+    const u = userEvent.setup()
+    const service = new FauxService(valide)
+    service.erreurDecision = { code: 'P0001', message: 'La commande n° 1045 a déjà été traitée' }
+    ouvrir(service)
+    await screen.findByRole('article', { name: 'Commande n° 1045' })
+    const lectures = service.commandesEnCours.mock.calls.length
+
+    await u.click(screen.getByRole('button', { name: 'Accepter la commande n° 1045' }))
+
+    expect(await screen.findByText('La commande n° 1045 a déjà été traitée')).toBeInTheDocument()
+    expect(service.commandesEnCours.mock.calls.length).toBeGreaterThan(lectures)
+  })
+})

@@ -412,6 +412,17 @@ export class ServiceRestaurantSupabase implements ServiceRestaurant {
       void this.client.removeChannel(canal)
     }
   }
+
+  async accepterCommande(commandeId: string): Promise<void> {
+    // Fonction de la base (migration US13) : vérifie le restaurant et l'état, prévient le client.
+    const { error } = await this.client.rpc('accepter_commande', { p_commande: commandeId })
+    if (error) throw error
+  }
+
+  async refuserCommande(commandeId: string, motif: string): Promise<void> {
+    const { error } = await this.client.rpc('refuser_commande', { p_commande: commandeId, p_motif: motif })
+    if (error) throw error
+  }
 }
 
 interface LigneCommandeBD {

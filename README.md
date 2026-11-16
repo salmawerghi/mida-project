@@ -35,8 +35,9 @@ apps/
 | US10 | Plats (espace web) : ajouter, modifier, supprimer un plat avec nom, description, prix positif, photo et catégorie ; aperçu côté client dans le formulaire | fait : 15 tests Vitest + 5 tests PGlite, essayé avec le vrai projet (plats avec photo) ; affichage dans l'appli client avec le catalogue |
 | US11 | Plat momentanément indisponible (espace web) : case « Disponible » sur chaque plat du menu, un clic pour le retirer de la commande ou le réactiver ; un plat indisponible ne peut pas être commandé | fait : 4 tests Vitest + 2 tests PGlite, migration appliquée sur Supabase, essayé avec le vrai projet ; affichage grisé dans l'appli client avec le catalogue |
 | US12 | Commandes en cours (espace web, page « Commandes ») : 4 colonnes (en attente, en préparation, prête, en livraison), nouvelles commandes en temps réel avec alerte sonore et visuelle, détail (plats, quantités, remarques, paiement) | fait : 15 tests Vitest + 2 tests PGlite, migration appliquée sur Supabase ; essayé avec deux commandes de test créées par SQL (n° 1001 en espèces, n° 1003 par carte) : arrivée en temps réel, son, bandeaux et pastille OK |
+| US13 | Accepter ou refuser une commande (espace web) : boutons sur les commandes en attente, fenêtre de refus avec motif obligatoire (4 motifs proposés + message au client), client prévenu par une notification, paiement par carte remboursé | codé : 8 tests Vitest + 4 tests PGlite, fonctions appliquées sur Supabase ; essai réel à faire (commandes de test 1001 et 1003) ; affichage des notifications dans l'appli client à venir |
 
-US01 à US03, US08, US09, US11 et US12 sont appliquées sur le projet Supabase de Mida (`tpfpuwlgnxhwhezicuto`) ; le jeu de test n'y est pas encore chargé.
+US01 à US03, US08, US09, US11, US12 et US13 sont appliquées sur le projet Supabase de Mida (`tpfpuwlgnxhwhezicuto`) ; le jeu de test n'y est pas encore chargé.
 
 ## Appliquer sur un projet Supabase
 
@@ -185,7 +186,16 @@ Page `/profil` (`src/pages/Profil.tsx`), dans le cadre à menu latéral (`src/Ca
 - **Alerte** (`src/commandes/suivi.tsx`, active sur toutes les pages de l'espace restaurant) :
   - visuelle : pastille rouge sur « Commandes » dans le menu (nombre de commandes en attente), bandeau « N nouvelles commandes à traiter », nombre dans le titre de l'onglet (« (2) Mida… »), carte mise en avant 15 secondes ; sur les autres pages, un bandeau « Nouvelle commande reçue ! » avec un lien vers les commandes ;
   - sonore : deux notes jouées avec Web Audio (`src/commandes/son.ts`, pas de fichier son). Le bouton « Alerte sonore activée / désactivée » garde le choix dans le navigateur. Les navigateurs bloquent le son tant que la page n'a reçu aucun clic : après un F5, le premier clic dans la page le débloque, et un message invite à cliquer si besoin.
-- **Essai réel sans appli client** : une commande peut être créée à la main dans l'éditeur SQL de Supabase (commande `en_attente` + ses `lignes_commande` + son `paiements`, dans une seule transaction). Les déclencheurs `restaurant_ouvert` (US08) et `plat_disponible` (US11) s'appliquent.
+- **Essai réel sans appli client** : une commande peut être créée à la main dans l'éditeur SQL de Supabase (commande `en_attente` + ses `lignes_commande` + son `paiements`, dans une seule transaction). Les déclencheurs `restaurant_ouvert` (US08) et `plat_disponible` (US11) s'appliquent. Attention : un paiement `paye` doit avoir sa date `paye_le` (contrainte de la table `paiements`).
+
+### Accepter ou refuser une commande (US13)
+
+- Sur la page `/commandes`, chaque commande **en attente** a deux boutons. **Accepter** : un clic, la commande passe à « acceptée » (colonne « En préparation »). **Refuser** : fenêtre « Refuser la commande n° … » (maquette « Restaurant · Refus ») avec un **motif obligatoire** (« Un plat est épuisé », « Trop de commandes en cours », « Le restaurant ferme bientôt », « Autre motif ») et un message facultatif au client, obligatoire pour « Autre motif ». Le motif enregistré est « Motif — message ». La fenêtre indique si le client sera remboursé (carte payée) ou non (espèces). Échap ou « Annuler » la ferme.
+- **Base** (migration `20261116000003`) : les applications n'ont toujours pas le droit de modifier une commande directement. Le responsable appelle `accepter_commande(p_commande)` ou `refuser_commande(p_commande, p_motif)`. Ces fonctions verrouillent la commande, vérifient qu'elle appartient au restaurant du responsable connecté (`private.est_responsable_de`) et qu'elle est encore `en_attente` (une seule décision : « La commande n° … a déjà été traitée »), puis :
+  - accepter : `etat = acceptee`, `acceptee_le = now()` ;
+  - refuser : `etat = refusee`, `motif_refus` ; un paiement par **carte déjà payé** passe à `rembourse` (le vrai remboursement auprès de la passerelle viendra avec la story du paiement) ;
+  - dans les deux cas, une **notification** est créée pour le client (« Commande acceptée » / « Commande refusée », avec le motif et le montant remboursé). L'appli client les affichera ; le changement d'état est aussi diffusé en temps réel (US12).
+- Les fonctions sont `security definer` (elles écrivent dans `commandes`, interdite aux applications) et réservées aux comptes connectés (`anon` n'y a pas accès). L'outil de sécurité de Supabase les signale (« Signed-In Users Can Execute SECURITY DEFINER Function ») : c'est voulu, car ce sont les seules portes d'entrée, et elles contrôlent elles-mêmes le restaurant et l'état.
 
 ## Mot de passe oublié (US06) — en attente du réglage e-mail
 

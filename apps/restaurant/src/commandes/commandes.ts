@@ -89,3 +89,28 @@ export function duree(depuis: Date, maintenant: Date): string {
 export function libelleATraiter(n: number): string {
   return n === 1 ? '1 nouvelle commande à traiter' : `${n} nouvelles commandes à traiter`
 }
+
+/** Motifs de refus proposés (maquette « Restaurant · Refus »), US13. */
+export const motifsRefus = ['Un plat est épuisé', 'Trop de commandes en cours', 'Le restaurant ferme bientôt', 'Autre motif'] as const
+export type MotifRefus = (typeof motifsRefus)[number]
+export const longueurMaxMessageRefus = 250
+
+/** Vérifie le formulaire de refus ; renvoie les erreurs à afficher sous les champs. */
+export function validerRefus(motif: MotifRefus | null, message: string): { motif?: string; message?: string } {
+  if (!motif) return { motif: 'Choisissez le motif du refus.' }
+  if (motif === 'Autre motif' && !message.trim()) return { message: 'Précisez le motif pour le client.' }
+  if (message.trim().length > longueurMaxMessageRefus) return { message: `${longueurMaxMessageRefus} caractères maximum.` }
+  return {}
+}
+
+/** Motif enregistré et envoyé au client : « Un plat est épuisé — Plus de merguez ce soir. » */
+export function composerMotif(motif: MotifRefus, message: string): string {
+  const texte = message.trim()
+  if (motif === 'Autre motif') return texte
+  return texte ? `${motif} — ${texte}` : motif
+}
+
+/** « 2 × Brik à l'œuf, 1 × Ojja merguez » (résumé d'une commande). */
+export function resumePlats(commande: Commande): string {
+  return commande.lignes.map((l) => `${l.quantite} × ${l.nomPlat}`).join(', ')
+}

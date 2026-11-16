@@ -183,6 +183,20 @@ export class FauxService implements ServiceRestaurant {
     for (const a of this.abonnes) a.rappel({ type: 'UPDATE', id, etat })
   }
 
+  erreurDecision: unknown = null
+
+  accepterCommande = vi.fn(async (id: string) => {
+    if (this.erreurDecision) throw this.erreurDecision
+    this.simulerChangement(id, 'acceptee')
+  })
+
+  refuserCommande = vi.fn(async (id: string, _motif: string) => {
+    if (this.erreurDecision) throw this.erreurDecision
+    // une commande refusée quitte la page « Commandes en cours »
+    this.simulerChangement(id, 'refusee')
+    this.commandes = this.commandes.filter((c) => c.id !== id)
+  })
+
   erreurOuverture: unknown = null
   changerOuverture = vi.fn(async (_id: string, ouvert: boolean) => {
     if (this.erreurOuverture) throw this.erreurOuverture

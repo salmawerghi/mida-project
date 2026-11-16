@@ -1,6 +1,21 @@
 import { describe, expect, it } from 'vitest'
 
-import { duree, ilYa, libelleATraiter, libellePaiement, nomCourt } from './commandes'
+import { composerMotif, duree, ilYa, libelleATraiter, libellePaiement, nomCourt, validerRefus } from './commandes'
+
+describe('refus d’une commande (US13)', () => {
+  it('motif obligatoire, message obligatoire pour « Autre motif »', () => {
+    expect(validerRefus(null, '')).toEqual({ motif: 'Choisissez le motif du refus.' })
+    expect(validerRefus('Un plat est épuisé', '')).toEqual({})
+    expect(validerRefus('Autre motif', '   ')).toEqual({ message: 'Précisez le motif pour le client.' })
+    expect(validerRefus('Autre motif', 'x'.repeat(251))).toEqual({ message: '250 caractères maximum.' })
+  })
+
+  it('motif envoyé au client', () => {
+    expect(composerMotif('Un plat est épuisé', '')).toBe('Un plat est épuisé')
+    expect(composerMotif('Un plat est épuisé', '  Plus de merguez.  ')).toBe('Un plat est épuisé — Plus de merguez.')
+    expect(composerMotif('Autre motif', ' Coupure de gaz ')).toBe('Coupure de gaz')
+  })
+})
 
 const midi = new Date('2026-11-16T12:00:00')
 const avant = (minutes: number) => new Date(midi.getTime() - minutes * 60_000)

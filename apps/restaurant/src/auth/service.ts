@@ -122,6 +122,10 @@ export interface ServiceRestaurant {
    * `surConnexion` est appelé à chaque (re)connexion. Renvoie de quoi se désabonner.
    */
   surCommandes(restaurantId: string, rappel: (e: EvenementCommande) => void, surConnexion: () => void): () => void
+  /** Accepte une commande en attente ; le client est prévenu (US13). */
+  accepterCommande(commandeId: string): Promise<void>
+  /** Refuse une commande en attente avec un motif (obligatoire) ; le client est prévenu, la carte remboursée. */
+  refuserCommande(commandeId: string, motif: string): Promise<void>
 }
 
 export interface ResultatPlat {

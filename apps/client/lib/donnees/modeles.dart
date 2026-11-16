@@ -141,6 +141,30 @@ String libelleOuverture({required bool ouvert, HoraireDuJour? horaire}) {
   return fin == null || horaire!.ferme ? 'Ouvert' : 'Ouvert · jusqu\'à $fin';
 }
 
+/// Commande enregistrée par le serveur (US19) : montants calculés par la base.
+class CommandePassee {
+  const CommandePassee({
+    required this.id,
+    required this.numero,
+    required this.sousTotal,
+    required this.fraisLivraison,
+    required this.total,
+  });
+  final String id;
+  final int numero;
+  final double sousTotal;
+  final double fraisLivraison;
+  final double total;
+
+  factory CommandePassee.depuis(Map<String, dynamic> r) => CommandePassee(
+        id: r['id'] as String,
+        numero: (r['numero'] as num).toInt(),
+        sousTotal: lireNombre(r['sous_total']),
+        fraisLivraison: lireNombre(r['frais_livraison']),
+        total: lireNombre(r['total']),
+      );
+}
+
 /// Texte comparable : minuscules, sans accents (« Bab Souïka » ≈ « bab souika »).
 String sansAccents(String texte) {
   const avec = 'àâäáãåçéèêëíìîïñóòôöõúùûüýÿœæ';

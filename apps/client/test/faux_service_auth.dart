@@ -8,7 +8,11 @@ class FauxServiceAuth implements ServiceAuth {
     this.erreur,
     this.erreurCode,
     this.erreursMotDePasse = const [],
+    this.connecte = false,
   });
+
+  /// Session ouverte (client connecté) ; `connecter` l'ouvre.
+  bool connecte;
   final ResultatInscription resultat;
 
   /// Levée par `inscrire`.
@@ -26,7 +30,7 @@ class FauxServiceAuth implements ServiceAuth {
   final reinitialisation = <String>[];
 
   @override
-  Session? get session => null;
+  Session? get session => connecte ? sessionTest : null;
   @override
   Stream<AuthState> get changements => const Stream.empty();
   @override
@@ -45,9 +49,13 @@ class FauxServiceAuth implements ServiceAuth {
   }
 
   @override
-  Future<void> connecter({required String email, required String motDePasse}) async {}
+  Future<void> connecter({required String email, required String motDePasse}) async {
+    appels.add({'connexion': email});
+    connecte = true;
+  }
+
   @override
-  Future<void> deconnecter() async {}
+  Future<void> deconnecter() async => connecte = false;
 
   @override
   Future<void> demanderReinitialisation(String email) async {
@@ -68,3 +76,16 @@ class FauxServiceAuth implements ServiceAuth {
     if (_echecs < erreursMotDePasse.length) throw erreursMotDePasse[_echecs++];
   }
 }
+
+/// Session factice d'un client connecté.
+final sessionTest = Session(
+  accessToken: 'jeton',
+  tokenType: 'bearer',
+  user: User(
+    id: 'c1',
+    appMetadata: const {},
+    userMetadata: const {'nom': 'Amine Belhadj'},
+    aud: 'authenticated',
+    createdAt: '2026-11-16T00:00:00Z',
+  ),
+);

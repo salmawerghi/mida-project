@@ -20,6 +20,15 @@ const ojja = Plat(id: 'k1', categorieId: 'mk', nom: 'Ojja merguez', prix: 12);
 Finder quantiteAffichee(String plat, int n) =>
     find.descendant(of: find.bySemanticsLabel(RegExp('^Plat $plat')), matching: find.text('$n'));
 
+/// Fait défiler jusqu'au sous-total, le vérifie, puis remonte en haut du panier.
+Future<void> verifierSousTotal(WidgetTester tester, String montant) async {
+  await defilerJusqua(tester, find.text('Sous-total'));
+  final ligne = find.ancestor(of: find.text('Sous-total'), matching: find.byType(Row)).first;
+  expect(find.descendant(of: ligne, matching: find.text(montant)), findsOneWidget);
+  await tester.drag(find.byType(Scrollable).first, const Offset(0, 3000));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   group('panier (US18)', () {
     test('ajouter, modifier les quantités, retirer : le total suit', () {
@@ -122,11 +131,11 @@ void main() {
         ..ajouter(zitouna, the)
         ..ajouter(zitouna, the);
       await ouvrirPage(tester, const PanierPage(), panier: panier);
-      expect(find.text('23,000 DT'), findsOneWidget); // sous-total : 18 + 2 × 2,5
+      await verifierSousTotal(tester, '23,000 DT'); // 18 + 2 × 2,5
 
       await tester.tap(find.byTooltip('Un Thé à la menthe de plus'));
       await tester.pump();
-      expect(find.text('25,500 DT'), findsOneWidget);
+      await verifierSousTotal(tester, '25,500 DT');
 
       await tester.tap(find.byTooltip('Retirer Couscous à l’agneau du panier'));
       await tester.pump();

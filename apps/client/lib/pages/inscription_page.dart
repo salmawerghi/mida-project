@@ -11,8 +11,11 @@ import 'connexion_page.dart';
 
 /// Création d'un compte client (maquette Client · Inscription).
 class InscriptionPage extends StatefulWidget {
-  const InscriptionPage({super.key, required this.auth});
+  const InscriptionPage({super.key, required this.auth, this.retourApresConnexion = false});
   final ServiceAuth auth;
+
+  /// Compte créé au moment de commander : revenir au panier au lieu de l'accueil.
+  final bool retourApresConnexion;
 
   @override
   State<InscriptionPage> createState() => _InscriptionPageState();
@@ -62,11 +65,16 @@ class _InscriptionPageState extends State<InscriptionPage> {
       );
       if (!mounted) return;
       if (resultat == ResultatInscription.connecte) {
-        Navigator.of(context).popUntil((route) => route.isFirst);
+        if (widget.retourApresConnexion) {
+          Navigator.of(context).pop(true);
+        } else {
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        }
       } else {
         Navigator.of(context).pushReplacement(MaterialPageRoute(
           builder: (_) => ConnexionPage(
             auth: widget.auth,
+            retourApresConnexion: widget.retourApresConnexion,
             emailInitial: _email.text.trim(),
             information: 'Compte créé ! Nous avons envoyé un lien de confirmation à '
                 '${_email.text.trim()}. Ouvrez-le, puis connectez-vous ici.',
@@ -225,7 +233,10 @@ class _InscriptionPageState extends State<InscriptionPage> {
                     Text('Déjà inscrit ?', style: textes.bodyMedium),
                     TextButton(
                       onPressed: () => Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(builder: (_) => ConnexionPage(auth: widget.auth)),
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              ConnexionPage(auth: widget.auth, retourApresConnexion: widget.retourApresConnexion),
+                        ),
                       ),
                       child: const Text('Se connecter'),
                     ),

@@ -41,8 +41,9 @@ apps/
 | US16 | Recherche d'un restaurant par nom (sans tenir compte des majuscules ni des accents) et filtre par catégorie ; message et « Effacer les filtres » s'il n'y a aucun résultat | codé : 5 tests Flutter ; essai réel à faire |
 | US17 | Menu d'un restaurant (appli client) : rubriques dans l'ordre du restaurant, plats avec photo, description et prix, plats indisponibles signalés, note, délai et horaire du jour ; restaurant fermé consultable avec un bandeau | codé : 7 tests Flutter ; essai réel à faire |
 | US18 | Panier (appli client) : ajouter des plats depuis le menu, modifier les quantités (1 à 20), retirer, vider ; total à jour ; un seul restaurant par panier (proposition de vider sinon) ; conservé en quittant l'écran | codé : 7 tests Flutter ; essai réel à faire |
+| US19 | Valider la commande (appli client) : adresse de livraison obligatoire, remarque, paiement en espèces, récapitulatif sous-total / frais / total ; total calculé par le serveur ; la commande arrive au restaurant « en attente » ; un visiteur se connecte d'abord, panier gardé | codé : 7 tests Flutter + 3 tests PGlite, fonction appliquée sur Supabase ; essai réel à faire |
 
-US01 à US03, US08, US09 et US11 à US15 sont appliquées sur le projet Supabase de Mida (`tpfpuwlgnxhwhezicuto`) ; le jeu de test n'y est pas encore chargé.
+US01 à US03, US08, US09, US11 à US15 et US19 sont appliquées sur le projet Supabase de Mida (`tpfpuwlgnxhwhezicuto`) ; le jeu de test n'y est pas encore chargé.
 
 ## Appliquer sur un projet Supabase
 
@@ -143,6 +144,13 @@ flutter run         # se connecte au projet Supabase de Mida (lib/config.dart)
 - Dans le menu, un plat disponible d'un restaurant ouvert a un bouton « + » ; une fois au panier, il devient « − 2 + » (la corbeille remplace « − » au dernier exemplaire). Quantité maximale : 20 par plat. La barre du bas « Voir le panier » affiche le nombre d'articles et le sous-total ; l'icône du panier, en haut de l'accueil, affiche le nombre d'articles.
 - **Un seul restaurant par panier** : ajouter un plat d'un autre restaurant ouvre « Commencer un nouveau panier ? » (« Garder mon panier » / « Vider et ajouter »).
 - Page panier : chaque ligne avec son montant et « − / + », sous-total mis à jour à chaque modification, bouton « Vider » (avec confirmation), et un écran « Votre panier est vide ».
+
+### Valider la commande (US19)
+
+- Sous les plats du panier : **adresse de livraison** (obligatoire), remarque pour le restaurant (facultative), mode de paiement **Espèces** (« À payer au livreur, à la livraison » ; « Carte en ligne » est affichée « Bientôt disponible »), puis le récapitulatif : sous-total, frais de livraison (lus dans `parametres`), total. Le bouton « Commander · 25,500 DT » envoie la commande. L'adresse et la remarque sont gardées dans le panier si l'on quitte l'écran.
+- **Visiteur** : « Commander » ouvre « Connectez-vous pour commander » (maquette « Client · Connexion requise » : « Votre panier est gardé », rappel du panier). « J'ai déjà un compte » ou « Créer un compte » ramènent ensuite **au panier** (paramètre `retourApresConnexion` de `ConnexionPage` et `InscriptionPage`), où le client n'a plus qu'à toucher « Commander ». « Continuer à explorer » revient au panier sans rien envoyer.
+- **Serveur** (migration `20261116000006`) : `passer_commande(p_restaurant, p_lignes, p_adresse, p_remarque)`, où `p_lignes` = `[{"plat_id", "quantite", "remarque"}]`. L'appli n'envoie **aucun prix** : la fonction relit le prix de chaque plat dans le menu et les frais dans `parametres`, et calcule `sous_total`, `frais_livraison` et `total`. Elle vérifie : compte **client** non bloqué, adresse non vide (300 caractères au plus), panier non vide (30 plats différents au plus, pas de doublon), quantités de 1 à 20, plats **du restaurant choisi** et **disponibles** ; le déclencheur d'US08 refuse un restaurant fermé. Elle crée la commande `en_attente`, ses lignes (nom et prix copiés), le paiement `especes` / `en_attente`, et une notification « Nouvelle commande » pour le restaurant. Elle renvoie `{id, numero, sous_total, frais_livraison, total}`. Les refus s'affichent tels quels dans l'appli (« Ce restaurant est fermé… », « Le plat « … » est indisponible pour le moment »).
+- Après l'envoi : panier vidé, retour à l'accueil avec « Commande n° … envoyée au restaurant » (le suivi arrive avec US20).
 
 - Les services sont fournis à tous les écrans par `Dependances.of(context)` (`lib/dependances.dart`) ; les tests utilisent `test/faux_service_mida.dart`.
 

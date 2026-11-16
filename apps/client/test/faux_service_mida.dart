@@ -1,5 +1,6 @@
 import 'package:mida_client/donnees/modeles.dart';
 import 'package:mida_client/donnees/service_mida.dart';
+import 'package:mida_client/panier/panier.dart';
 
 /// Faux service de données : catalogue en mémoire, appels enregistrés.
 class FauxServiceMida implements ServiceMida {
@@ -30,6 +31,39 @@ class FauxServiceMida implements ServiceMida {
   Future<MenuRestaurant> menu(String restaurantId) {
     menusDemandes.add(restaurantId);
     return _repondre(restaurantId == 'r1' ? menuTest : const MenuRestaurant(categories: [], plats: []));
+  }
+
+  @override
+  Future<double> fraisLivraison() async => 2.5;
+
+  /// Commandes passées (US19) : restaurant, lignes, adresse, remarque.
+  final commandes = <Map<String, Object?>>[];
+
+  /// Levée par `passerCommande` (refus du serveur).
+  Object? erreurCommande;
+
+  @override
+  Future<CommandePassee> passerCommande({
+    required String restaurantId,
+    required List<LignePanier> lignes,
+    required String adresse,
+    String? remarque,
+  }) async {
+    if (erreurCommande != null) throw erreurCommande!;
+    commandes.add({
+      'restaurant': restaurantId,
+      'lignes': [for (final l in lignes) '${l.quantite} × ${l.plat.nom}'],
+      'adresse': adresse,
+      'remarque': remarque,
+    });
+    final sousTotal = lignes.fold(0.0, (s, l) => s + l.total);
+    return CommandePassee(
+      id: 'cmd${commandes.length}',
+      numero: 1046 + commandes.length,
+      sousTotal: sousTotal,
+      fraisLivraison: 2.5,
+      total: sousTotal + 2.5,
+    );
   }
 
   /// Les catégories ne se chargent pas (le catalogue doit rester utilisable).

@@ -1018,3 +1018,75 @@ test('US15 · le catalogue : restaurants validés seulement, avec leur note et l
     }, ajout);
   }
 });
+
+// =====================================================================
+// US19 — passer commande (espèces)
+// =====================================================================
+const P_AGNEAU = '40000000-0000-4000-8000-000000000001';         // Dar Zitouna, 18 DT
+const passer = (lignesPanier, adresse = '12, rue du Jasmin, La Marsa', restaurant = R_ZITOUNA, remarque = null) =>
+  requete(`select public.passer_commande($1, $2::jsonb, $3, $4) as r`, [restaurant, JSON.stringify(lignesPanier), adresse, remarque]);
+
+test('US19 · le client passe commande : montants calculés par le serveur, restaurant prévenu', async () => {
+  await en('amine', async () => {
+    const { rows: [{ r }] } = await passer(
+      [{ plat_id: P_AGNEAU, quantite: 2, remarque: ' Bien piquant ' }, { plat_id: P_THE, quantite: 3, prix: 0.001 }],
+      ' 12, rue du Jasmin, La Marsa ', R_ZITOUNA, 'Sonner deux fois');
+    // 2 × 18 + 3 × 2,5 = 43,500 ; frais 2,500 (paramètres) ; le « prix » envoyé par l'appli est ignoré
+    assert.deepEqual([r.sous_total, r.frais_livraison, r.total].map(Number), [43.5, 2.5, 46]);
+    assert.ok(r.numero > 1046);
+    const [c] = await lignes(`select etat::text, adresse_livraison, remarque, client_id from public.commandes where id = $1`, [r.id]);
+    assert.deepEqual(c, { etat: 'en_attente', adresse_livraison: '12, rue du Jasmin, La Marsa', remarque: 'Sonner deux fois', client_id: ids.amine });
+    const detail = await lignes(`select nom_plat, quantite, prix_unitaire::text, remarque from public.lignes_commande
+                                 where commande_id = $1 order by nom_plat`, [r.id]);
+    assert.deepEqual(detail, [
+      { nom_plat: 'Couscous à l\'agneau', quantite: 2, prix_unitaire: '18.000', remarque: 'Bien piquant' },
+      { nom_plat: 'Thé à la menthe', quantite: 3, prix_unitaire: '2.500', remarque: null },
+    ]);
+    assert.deepEqual(await lignes(`select mode::text, montant::text, etat::text from public.paiements where commande_id = $1`, [r.id]),
+                     [{ mode: 'especes', montant: '46.000', etat: 'en_attente' }]);
+    // le restaurant la voit, et reçoit une notification
+    await db.exec('reset role');
+    const [n] = await lignes(`select destinataire_id, titre from public.notifications where commande_id = $1`, [r.id]);
+    assert.deepEqual(n, { destinataire_id: ids.zitouna, titre: 'Nouvelle commande' });
+  });
+});
+
+test('US19 · refus : adresse, panier vide, quantités, plat indisponible ou d\'un autre restaurant, restaurant fermé', async () => {
+  await en('amine', async () => {
+    const ok = [{ plat_id: P_AGNEAU, quantite: 1 }];
+    await assert.rejects(passer(ok, '   '), /adresse de livraison est obligatoire/);
+    await assert.rejects(passer([]), /panier est vide/);
+    await assert.rejects(passer({ plat_id: P_AGNEAU }), /panier est vide/);
+    for (const quantite of [0, 21, -1, 'deux', 1.5]) {
+      await assert.rejects(passer([{ plat_id: P_AGNEAU, quantite }]), /Quantité invalide/);
+    }
+    await assert.rejects(passer([{ plat_id: P_AGNEAU, quantite: 1 }, { plat_id: P_AGNEAU, quantite: 2 }]), /apparaît deux fois/);
+    await assert.rejects(passer([{ plat_id: P_COUS_POISSON, quantite: 1 }]), /« Couscous au poisson » est indisponible/);
+    await assert.rejects(passer([{ plat_id: P_OJJA_MERGUEZ, quantite: 1 }]), /n'est plus au menu de ce restaurant/);
+    await assert.rejects(passer([{ plat_id: 'pas-un-uuid', quantite: 1 }]), /n'est plus au menu/);
+    assert.equal((await lignes(`select count(*)::int as n from public.commandes where client_id = $1`, [ids.amine]))[0].n, 3);
+  });
+  // restaurant fermé : refusé par le déclencheur d'US08
+  await en('amine', async () => {
+    await assert.rejects(passer([{ plat_id: P_AGNEAU, quantite: 1 }]), /restaurant est fermé/);
+  }, `update public.restaurants set ouvert = false where id = '${R_ZITOUNA}'`);
+});
+
+test('US19 · seul un compte client passe commande ; jamais directement dans la table', async () => {
+  for (const qui of ['zitouna', 'sami']) {
+    await en(qui, async () => {
+      await assert.rejects(passer([{ plat_id: P_AGNEAU, quantite: 1 }]), /Seul un compte client/);
+    });
+  }
+  await en(null, async () => {
+    await assert.rejects(passer([{ plat_id: P_AGNEAU, quantite: 1 }]), /permission denied/);
+  });
+  await en('amine', async () => {
+    await assert.rejects(lignes(`insert into public.commandes (client_id, restaurant_id, adresse_livraison, sous_total, frais_livraison, total)
+                                 values ($1, $2, 'x', 1, 0, 1)`, [ids.amine, R_ZITOUNA]), /row-level security|permission denied/);
+  });
+  // compte bloqué
+  await en('amine', async () => {
+    await assert.rejects(passer([{ plat_id: P_AGNEAU, quantite: 1 }]), /compte est bloqué/);
+  }, `update public.profiles set etat_compte = 'bloque' where email = 'amine@mida.test'`);
+});

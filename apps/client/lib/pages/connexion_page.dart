@@ -18,6 +18,7 @@ class ConnexionPage extends StatefulWidget {
     this.emailInitial,
     this.information,
     this.motDePasseOublie = motDePasseOublieActif,
+    this.retourApresConnexion = false,
   });
   final ServiceAuth auth;
   final String? emailInitial;
@@ -27,6 +28,9 @@ class ConnexionPage extends StatefulWidget {
 
   /// Affiche le lien « Mot de passe oublié ? » (voir `motDePasseOublieActif`).
   final bool motDePasseOublie;
+
+  /// Connexion demandée au moment de commander : revenir au panier au lieu de l'accueil.
+  final bool retourApresConnexion;
 
   @override
   State<ConnexionPage> createState() => _ConnexionPageState();
@@ -54,7 +58,12 @@ class _ConnexionPageState extends State<ConnexionPage> {
     try {
       await widget.auth.connecter(email: _email.text, motDePasse: _motDePasse.text);
       // La session est ouverte : l'écran racine affiche désormais l'accueil.
-      if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
+      if (!mounted) return;
+      if (widget.retourApresConnexion) {
+        Navigator.of(context).pop(true);
+      } else {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
     } catch (e) {
       if (mounted) setState(() => _erreur = messageErreur(e));
     } finally {
@@ -184,7 +193,12 @@ class _ConnexionPageState extends State<ConnexionPage> {
                             Text('Pas encore de compte ?', style: textes.bodyMedium),
                             TextButton(
                               onPressed: () => Navigator.of(context).pushReplacement(
-                                MaterialPageRoute(builder: (_) => InscriptionPage(auth: widget.auth)),
+                                MaterialPageRoute(
+                                  builder: (_) => InscriptionPage(
+                                    auth: widget.auth,
+                                    retourApresConnexion: widget.retourApresConnexion,
+                                  ),
+                                ),
                               ),
                               child: const Text('Créer un compte'),
                             ),

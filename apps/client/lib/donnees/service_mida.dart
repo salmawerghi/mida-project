@@ -1,5 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../panier/panier.dart';
+import 'format.dart';
 import 'modeles.dart';
 
 /// Données de Mida lues et écrites par l'appli client (remplaçable dans les tests).
@@ -12,6 +14,17 @@ abstract class ServiceMida {
 
   /// Menu d'un restaurant : rubriques, plats (disponibles ou non) et horaires du jour (US17).
   Future<MenuRestaurant> menu(String restaurantId);
+
+  /// Frais de livraison actuels (paramètres de la plateforme), pour l'aperçu du panier.
+  Future<double> fraisLivraison();
+
+  /// Passe la commande (US19, paiement en espèces). Le serveur recalcule tous les montants.
+  Future<CommandePassee> passerCommande({
+    required String restaurantId,
+    required List<LignePanier> lignes,
+    required String adresse,
+    String? remarque,
+  });
 }
 
 class ServiceMidaSupabase implements ServiceMida {
@@ -62,5 +75,30 @@ class ServiceMidaSupabase implements ServiceMida {
       plats: [for (final p in plats) Plat.depuis(p)],
       horaire: horaire == null ? null : HoraireDuJour.depuis(horaire),
     );
+  }
+
+  @override
+  Future<double> fraisLivraison() async {
+    final p = await _client.from('parametres').select('frais_livraison').eq('id', 1).single();
+    return lireNombre(p['frais_livraison']);
+  }
+
+  @override
+  Future<CommandePassee> passerCommande({
+    required String restaurantId,
+    required List<LignePanier> lignes,
+    required String adresse,
+    String? remarque,
+  }) async {
+    // Fonction de la base (migration US19) : seuls les plats et les quantités sont envoyés.
+    final r = await _client.rpc('passer_commande', params: {
+      'p_restaurant': restaurantId,
+      'p_lignes': [
+        for (final l in lignes) {'plat_id': l.plat.id, 'quantite': l.quantite},
+      ],
+      'p_adresse': adresse,
+      'p_remarque': remarque,
+    });
+    return CommandePassee.depuis(Map<String, dynamic>.from(r as Map));
   }
 }

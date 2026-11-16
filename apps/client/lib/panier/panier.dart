@@ -30,6 +30,11 @@ class Panier extends ChangeNotifier {
   RestaurantCatalogue? _restaurant;
   final _lignes = <LignePanier>[];
 
+  /// Adresse et remarque saisies au moment de commander : gardées si le client
+  /// quitte le panier (pour se connecter, par exemple).
+  String adresse = '';
+  String remarque = '';
+
   RestaurantCatalogue? get restaurant => _restaurant;
   List<LignePanier> get lignes => List.unmodifiable(_lignes);
   bool get estVide => _lignes.isEmpty;

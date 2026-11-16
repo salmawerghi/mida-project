@@ -55,5 +55,15 @@ String messageErreur(Object erreur) {
       return 'Les inscriptions sont momentanément fermées.';
     }
   }
+  // Refus explicites des fonctions de Mida (commande, annulation…) : message déjà en français.
+  if (erreur is PostgrestException) {
+    final message = erreur.message;
+    if (erreur.code == 'P0001') return message;
+    if (erreur.code == '42501') {
+      return message.contains('permission denied') || message.contains('row-level security')
+          ? "Ce compte n'a pas le droit de faire cette action."
+          : message;
+    }
+  }
   return 'Une erreur est survenue. Réessayez dans un instant.';
 }

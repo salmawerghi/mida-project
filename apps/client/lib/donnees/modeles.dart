@@ -61,6 +61,86 @@ class RestaurantCatalogue {
   }
 }
 
+/// Rubrique du menu d'un restaurant (« Couscous », « Douceurs »…), dans l'ordre choisi par le restaurant.
+class CategorieMenu {
+  const CategorieMenu({required this.id, required this.nom});
+  final String id;
+  final String nom;
+}
+
+/// Plat du menu (US17). Un plat indisponible reste affiché mais ne peut pas être commandé.
+class Plat {
+  const Plat({
+    required this.id,
+    required this.categorieId,
+    required this.nom,
+    this.description = '',
+    required this.prix,
+    this.imageUrl,
+    this.disponible = true,
+  });
+
+  final String id;
+  final String categorieId;
+  final String nom;
+  final String description;
+
+  /// En dinars, ex. 16.5 pour 16,500 DT.
+  final double prix;
+  final String? imageUrl;
+  final bool disponible;
+
+  factory Plat.depuis(Map<String, dynamic> l) => Plat(
+        id: l['id'] as String,
+        categorieId: l['categorie_id'] as String,
+        nom: l['nom'] as String,
+        description: l['description'] as String? ?? '',
+        prix: lireNombre(l['prix']),
+        imageUrl: l['image_url'] as String?,
+        disponible: l['disponible'] as bool? ?? true,
+      );
+}
+
+/// Horaires du jour : `null` si le restaurant ne les a pas renseignés.
+class HoraireDuJour {
+  const HoraireDuJour({required this.ferme, this.ouverture, this.fermeture});
+  final bool ferme;
+
+  /// « 11:00 » (heures locales de Tunisie, telles que saisies par le restaurant).
+  final String? ouverture;
+  final String? fermeture;
+
+  factory HoraireDuJour.depuis(Map<String, dynamic> l) {
+    String? court(Object? h) => h == null ? null : (h as String).substring(0, 5);
+    return HoraireDuJour(
+      ferme: l['ferme'] as bool? ?? false,
+      ouverture: court(l['ouverture']),
+      fermeture: court(l['fermeture']),
+    );
+  }
+}
+
+/// Menu complet d'un restaurant : rubriques dans l'ordre, et leurs plats.
+class MenuRestaurant {
+  const MenuRestaurant({required this.categories, required this.plats, this.horaire});
+  final List<CategorieMenu> categories;
+  final List<Plat> plats;
+  final HoraireDuJour? horaire;
+
+  /// Rubriques qui contiennent au moins un plat, avec leurs plats.
+  List<(CategorieMenu, List<Plat>)> get rubriques => [
+        for (final c in categories)
+          if (plats.any((p) => p.categorieId == c.id)) (c, [for (final p in plats) if (p.categorieId == c.id) p]),
+      ];
+}
+
+/// « Ouvert · jusqu'à 23:00 », « Fermé », « Fermé aujourd'hui ».
+String libelleOuverture({required bool ouvert, HoraireDuJour? horaire}) {
+  if (!ouvert) return horaire?.ferme == true ? 'Fermé aujourd\'hui' : 'Fermé';
+  final fin = horaire?.fermeture;
+  return fin == null || horaire!.ferme ? 'Ouvert' : 'Ouvert · jusqu\'à $fin';
+}
+
 /// Texte comparable : minuscules, sans accents (« Bab Souïka » ≈ « bab souika »).
 String sansAccents(String texte) {
   const avec = 'àâäáãåçéèêëíìîïñóòôöõúùûüýÿœæ';

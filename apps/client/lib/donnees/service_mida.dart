@@ -9,6 +9,9 @@ abstract class ServiceMida {
 
   /// Catégories de restaurants, pour le filtre du catalogue (US16).
   Future<List<CategorieRestaurant>> categoriesRestaurant();
+
+  /// Menu d'un restaurant : rubriques, plats (disponibles ou non) et horaires du jour (US17).
+  Future<MenuRestaurant> menu(String restaurantId);
 }
 
 class ServiceMidaSupabase implements ServiceMida {
@@ -36,5 +39,28 @@ class ServiceMidaSupabase implements ServiceMida {
   Future<List<CategorieRestaurant>> categoriesRestaurant() async {
     final lignes = await _client.from('categories_restaurant').select('id, nom').order('ordre').order('nom');
     return [for (final l in lignes) CategorieRestaurant(id: l['id'] as String, nom: l['nom'] as String)];
+  }
+
+  @override
+  Future<MenuRestaurant> menu(String restaurantId) async {
+    final categories =
+        await _client.from('categories_menu').select('id, nom').eq('restaurant_id', restaurantId).order('ordre').order('nom');
+    final plats = await _client
+        .from('plats')
+        .select('id, categorie_id, nom, description, prix, image_url, disponible')
+        .eq('restaurant_id', restaurantId)
+        .order('nom');
+    // 1 = lundi … 7 = dimanche, comme DateTime.weekday
+    final horaire = await _client
+        .from('horaires')
+        .select('ouverture, fermeture, ferme')
+        .eq('restaurant_id', restaurantId)
+        .eq('jour', DateTime.now().weekday)
+        .maybeSingle();
+    return MenuRestaurant(
+      categories: [for (final c in categories) CategorieMenu(id: c['id'] as String, nom: c['nom'] as String)],
+      plats: [for (final p in plats) Plat.depuis(p)],
+      horaire: horaire == null ? null : HoraireDuJour.depuis(horaire),
+    );
   }
 }

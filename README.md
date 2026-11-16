@@ -39,6 +39,7 @@ apps/
 | US14 | Faire avancer une commande (espace web) : « Commencer la préparation » (acceptée → en préparation) puis « Marquer comme prête », une étape par clic, sans saut ni retour en arrière ; client prévenu à chaque étape | codé : 4 tests Vitest + 3 tests PGlite, fonction appliquée sur Supabase ; essai réel à faire (commande de test 1001) |
 | US15 | Catalogue de l'appli client : restaurants validés (ouverts d'abord), avec logo, catégorie, ville, note moyenne et nombre d'avis, état ouvert / fermé, délai ; aussi pour les visiteurs | codé : 6 tests Flutter + 1 test PGlite, vue appliquée sur Supabase ; essai réel à faire |
 | US16 | Recherche d'un restaurant par nom (sans tenir compte des majuscules ni des accents) et filtre par catégorie ; message et « Effacer les filtres » s'il n'y a aucun résultat | codé : 5 tests Flutter ; essai réel à faire |
+| US17 | Menu d'un restaurant (appli client) : rubriques dans l'ordre du restaurant, plats avec photo, description et prix, plats indisponibles signalés, note, délai et horaire du jour ; restaurant fermé consultable avec un bandeau | codé : 7 tests Flutter ; essai réel à faire |
 
 US01 à US03, US08, US09 et US11 à US15 sont appliquées sur le projet Supabase de Mida (`tpfpuwlgnxhwhezicuto`) ; le jeu de test n'y est pas encore chargé.
 
@@ -128,6 +129,13 @@ flutter run         # se connecte au projet Supabase de Mida (lib/config.dart)
 - Ordre : ouverts d'abord, puis les mieux notés, puis par nom. Tirer vers le bas recharge la liste.
 - Données (`lib/donnees/service_mida.dart`) : `restaurants` filtrés sur `etat = actif` (la RLS ne montre déjà que ceux-là) avec `categories_restaurant(nom)`, et la vue **`notes_restaurants`** (migration `20261116000005`, `security_invoker`) : note moyenne arrondie à 0,1 et nombre d'avis par restaurant.
 - **Recherche et filtre (US16)** : champ « Rechercher un restaurant » (filtre au fil de la saisie, par mots, sans majuscules ni accents ; il cherche dans le nom et la catégorie) et puces de catégorie (« Tous » + seulement les catégories qui ont au moins un restaurant). S'il n'y a aucun résultat : « Aucun restaurant ne correspond à « … » » et un bouton « Effacer les filtres ». Si les catégories ne se chargent pas, le catalogue reste utilisable sans le filtre. Le filtrage se fait dans l'appli (`filtrerRestaurants`, `lib/donnees/modeles.dart`) : le catalogue est petit et déjà chargé.
+
+### Menu d'un restaurant (US17)
+
+- Toucher un restaurant du catalogue ouvre `RestaurantPage` (maquette « Client · Restaurant ») : en-tête bleu avec le logo, puis note (« ★ 4,8 », « 12 avis »), délai, et ouverture du jour (« Ouvert, jusqu'à 23:00 », d'après la table `horaires`, 1 = lundi comme `DateTime.weekday`).
+- Le menu est classé par rubriques (`categories_menu`, dans l'ordre choisi par le restaurant ; les rubriques vides sont masquées). Des puces en haut font défiler jusqu'à une rubrique. Chaque plat montre sa photo (ou une illustration Mida), sa description et son prix ; un plat **indisponible** (US11) est grisé avec l'étiquette « Indisponible ».
+- Un restaurant **fermé** reste consultable, avec un bandeau « Ce restaurant est fermé pour le moment : vous pouvez consulter son menu, mais pas commander. »
+
 - Les services sont fournis à tous les écrans par `Dependances.of(context)` (`lib/dependances.dart`) ; les tests utilisent `test/faux_service_mida.dart`.
 
 - Si la compilation Android échoue sur le cache Kotlin (« Could not close incremental caches ») : c'est le projet sur `D:` et le cache pub sur `C:` ; `kotlin.incremental=false` est déjà dans `android/gradle.properties`.

@@ -113,9 +113,12 @@ class CarteRestaurant extends StatelessWidget {
 
 /// « ★ 4,8 (12 avis) », ou « Nouveau » sans avis.
 class NoteRestaurant extends StatelessWidget {
-  const NoteRestaurant({super.key, required this.note, required this.nbAvis});
+  const NoteRestaurant({super.key, required this.note, required this.nbAvis, this.compact = false});
   final double? note;
   final int nbAvis;
+
+  /// « ★ 4,8 » seulement (le nombre d'avis est affiché à part).
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -128,7 +131,7 @@ class NoteRestaurant extends StatelessWidget {
         const Icon(Icons.star_rounded, size: 18, color: Couleurs.dore),
         const SizedBox(width: 2),
         Text(
-          '${formaterNote(note!)} ($nbAvis avis)',
+          compact ? formaterNote(note!) : '${formaterNote(note!)} ($nbAvis avis)',
           style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Couleurs.nuit),
         ),
       ],

@@ -9,6 +9,7 @@ import '../widgets/catalogue.dart';
 import '../widgets/composants.dart';
 import 'connexion_page.dart';
 import 'inscription_page.dart';
+import 'restaurant_page.dart';
 
 /// Accueil : le catalogue des restaurants (maquette « Client · Accueil »,
 /// US15), avec recherche par nom et filtre par catégorie (US16). Ouvert aussi aux visiteurs sans compte : la connexion n'est
@@ -175,7 +176,12 @@ class _AccueilPageState extends State<AccueilPage> {
               Text('Aucun restaurant pour le moment. Revenez bientôt !', style: textes.bodyMedium)
             else
               for (final r in restaurants) ...[
-                CarteRestaurant(restaurant: r),
+                CarteRestaurant(
+                  restaurant: r,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => RestaurantPage(restaurant: r)),
+                  ),
+                ),
                 const SizedBox(height: 14),
               ],
             if (widget.visiteur) ...[

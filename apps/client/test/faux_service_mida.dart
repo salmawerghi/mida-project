@@ -24,6 +24,14 @@ class FauxServiceMida implements ServiceMida {
   @override
   Future<List<RestaurantCatalogue>> restaurants() => _repondre([..._restaurants]..sort(comparerRestaurants));
 
+  final menusDemandes = <String>[];
+
+  @override
+  Future<MenuRestaurant> menu(String restaurantId) {
+    menusDemandes.add(restaurantId);
+    return _repondre(restaurantId == 'r1' ? menuTest : const MenuRestaurant(categories: [], plats: []));
+  }
+
   /// Les catégories ne se chargent pas (le catalogue doit rester utilisable).
   bool erreurCategories = false;
 
@@ -33,6 +41,22 @@ class FauxServiceMida implements ServiceMida {
     return categoriesTest;
   }
 }
+
+/// Menu de Dar Zitouna (r1) ; les autres restaurants n'ont pas encore de menu.
+const menuTest = MenuRestaurant(
+  categories: [
+    CategorieMenu(id: 'm1', nom: 'Couscous'),
+    CategorieMenu(id: 'm2', nom: 'Tajines'), // vide : pas affichée
+    CategorieMenu(id: 'm3', nom: 'Douceurs et thé'),
+  ],
+  plats: [
+    Plat(id: 'p1', categorieId: 'm1', nom: 'Couscous à l’agneau', description: 'Semoule fine, agneau', prix: 18),
+    Plat(id: 'p2', categorieId: 'm1', nom: 'Couscous au poisson', description: 'Mérou', prix: 22.5, disponible: false),
+    Plat(id: 'p3', categorieId: 'm1', nom: 'Couscous aux légumes', prix: 13),
+    Plat(id: 'p4', categorieId: 'm3', nom: 'Thé à la menthe', prix: 2.5),
+  ],
+  horaire: HoraireDuJour(ferme: false, ouverture: '11:00', fermeture: '23:00'),
+);
 
 const categoriesTest = [
   CategorieRestaurant(id: 'k1', nom: 'Couscous et tajines'),

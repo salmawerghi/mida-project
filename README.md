@@ -33,9 +33,10 @@ apps/
 | US08 | Ouvrir ou fermer son restaurant en un clic (interrupteur du menu de l'espace web) ; un restaurant fermé ou non validé ne reçoit plus de nouvelle commande | fait : 4 tests Vitest + 4 tests PGlite, migration appliquée sur Supabase, essayé avec un vrai restaurant validé ; affichage côté client avec le catalogue |
 | US09 | Catégories du menu (espace web, page « Menu ») : créer, renommer, ordonner ; suppression avec confirmation, qui annonce et supprime les plats de la catégorie | fait : 16 tests Vitest + 4 tests PGlite, fonction appliquée sur Supabase, essayé avec le vrai projet |
 | US10 | Plats (espace web) : ajouter, modifier, supprimer un plat avec nom, description, prix positif, photo et catégorie ; aperçu côté client dans le formulaire | fait : 15 tests Vitest + 5 tests PGlite, essayé avec le vrai projet (plats avec photo) ; affichage dans l'appli client avec le catalogue |
-| US11 | Plat momentanément indisponible (espace web) : case « Disponible » sur chaque plat du menu, un clic pour le retirer de la commande ou le réactiver ; un plat indisponible ne peut pas être commandé | codé : 4 tests Vitest + 2 tests PGlite, migration appliquée sur Supabase ; essai réel à faire ; affichage grisé dans l'appli client avec le catalogue |
+| US11 | Plat momentanément indisponible (espace web) : case « Disponible » sur chaque plat du menu, un clic pour le retirer de la commande ou le réactiver ; un plat indisponible ne peut pas être commandé | fait : 4 tests Vitest + 2 tests PGlite, migration appliquée sur Supabase, essayé avec le vrai projet ; affichage grisé dans l'appli client avec le catalogue |
+| US12 | Commandes en cours (espace web, page « Commandes ») : 4 colonnes (en attente, en préparation, prête, en livraison), nouvelles commandes en temps réel avec alerte sonore et visuelle, détail (plats, quantités, remarques, paiement) | codé : 15 tests Vitest + 2 tests PGlite, migration appliquée sur Supabase ; essai réel à faire (avec une commande de test, l'appli client ne commande pas encore) |
 
-US01 à US03, US08, US09 et US11 sont appliquées sur le projet Supabase de Mida (`tpfpuwlgnxhwhezicuto`) ; le jeu de test n'y est pas encore chargé.
+US01 à US03, US08, US09, US11 et US12 sont appliquées sur le projet Supabase de Mida (`tpfpuwlgnxhwhezicuto`) ; le jeu de test n'y est pas encore chargé.
 
 ## Appliquer sur un projet Supabase
 
@@ -176,6 +177,15 @@ Page `/profil` (`src/pages/Profil.tsx`), dans le cadre à menu latéral (`src/Ca
 - Sur la page `/menu`, chaque plat a une case **« Disponible »**, comme dans la maquette « Restaurant · Menu ». Un clic la décoche : le plat est grisé, marqué « Indisponible », et le sous-titre compte les plats indisponibles (« 3 catégories · 8 plats · 1 plat indisponible »). Un second clic le réactive. Pas de confirmation, car l'action se défait aussi vite. Si la base refuse, la case revient comme avant et un message s'affiche.
 - **Côté client** : le plat reste visible (les clients savent qu'il existe), mais il ne peut pas être commandé. La base le garantit, quelle que soit l'appli : le déclencheur `plat_disponible` sur `lignes_commande` (migration `20261116000001`, fonction `private.verifier_plat_disponible`) refuse une ligne d'une commande `en_attente` dont le plat est indisponible (« Le plat « … » est indisponible pour le moment »). La future fonction « passer commande » et le panier de l'appli client devront afficher ce refus ; le panier devra aussi griser le bouton « Ajouter ».
 - Les commandes déjà passées ne sont pas concernées si le plat devient indisponible ensuite.
+
+### Commandes en cours en temps réel (US12)
+
+- Page `/commandes` (`src/pages/Commandes.tsx`, maquette « Restaurant · Commandes en cours »), réservée aux restaurants validés. Quatre colonnes : **En attente**, **En préparation** (acceptée ou en préparation), **Prête**, **En cours de livraison**. Chaque carte montre le numéro, le client (prénom et initiale), l'heure, les plats avec leur quantité et leur remarque, la remarque du client, le mode de paiement (« Espèces à la livraison », « Carte · payée ») et le total. Les boutons Accepter / Refuser viendront avec US13, « Marquer comme prête » avec US14, le nom du livreur avec les stories du livreur.
+- **Temps réel** : Supabase Realtime, migration `20261116000002` (table `commandes` ajoutée à la publication `supabase_realtime`). L'abonnement (`surCommandes`) filtre sur le restaurant, et Realtime applique la RLS : un restaurant ne reçoit que ses commandes. À chaque événement, l'appli relit la liste complète avec son détail (une requête, 300 ms après le dernier événement), et aussi à chaque reconnexion.
+- **Alerte** (`src/commandes/suivi.tsx`, active sur toutes les pages de l'espace restaurant) :
+  - visuelle : pastille rouge sur « Commandes » dans le menu (nombre de commandes en attente), bandeau « N nouvelles commandes à traiter », nombre dans le titre de l'onglet (« (2) Mida… »), carte mise en avant 15 secondes ; sur les autres pages, un bandeau « Nouvelle commande reçue ! » avec un lien vers les commandes ;
+  - sonore : deux notes jouées avec Web Audio (`src/commandes/son.ts`, pas de fichier son). Le bouton « Alerte sonore activée / désactivée » garde le choix dans le navigateur. Les navigateurs bloquent le son tant que la page n'a reçu aucun clic : après un F5, le premier clic dans la page le débloque, et un message invite à cliquer si besoin.
+- **Essai réel sans appli client** : une commande peut être créée à la main dans l'éditeur SQL de Supabase (commande `en_attente` + ses `lignes_commande` + son `paiements`, dans une seule transaction). Les déclencheurs `restaurant_ouvert` (US08) et `plat_disponible` (US11) s'appliquent.
 
 ## Mot de passe oublié (US06) — en attente du réglage e-mail
 

@@ -1077,3 +1077,227 @@ textarea.saisie {
     padding: 20px 16px;
   }
 }
+
+/* ---------- Commandes en cours (US12) ---------- */
+.cadre-lien {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.cadre-pastille {
+  min-width: 26px;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--harissa);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.alerte-commande {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px 18px;
+  border-radius: 18px;
+  background: var(--harissa);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 5px 0 #8f2413;
+  animation: alerte-apparition 0.4s ease-out;
+}
+.commandes-date::first-letter {
+  text-transform: uppercase;
+}
+.commandes-entete-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.commandes-alerte {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 18px;
+  border-radius: 999px;
+  background: var(--harissa-pale);
+  color: #8f2413;
+  font-weight: 600;
+  animation: alerte-apparition 0.4s ease-out;
+}
+.commandes-son[aria-pressed='false'] {
+  color: var(--texte-doux);
+}
+.lien-bouton {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--bleu);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.commandes-erreur {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+.commandes-colonnes {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+.commandes-colonne {
+  background: #e9eef7;
+  border-radius: 22px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.commandes-colonne h2 {
+  font-size: 19px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.commandes-compte {
+  min-width: 26px;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--bleu-fonce);
+  font: 700 13px var(--corps);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.commandes-vide {
+  margin: 0;
+  font-size: 14px;
+}
+.commande {
+  background: #fff;
+  border-radius: 18px;
+  padding: 14px;
+  box-shadow: 0 4px 0 var(--bordure);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.commande-nouvelle {
+  outline: 3px solid var(--dore);
+  animation: alerte-apparition 0.4s ease-out;
+}
+.commande-entete {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 14px;
+}
+.commande-numero {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.commande-temps {
+  color: var(--texte-doux);
+}
+.commande-nouvelle .commande-temps {
+  color: #8f2413;
+  font-weight: 700;
+}
+.commande-lignes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+.commande-remarque-ligne {
+  display: block;
+  font-size: 13px;
+  color: var(--texte-doux);
+  font-style: italic;
+}
+.commande-remarque {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--dore-clair);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.commande-remarque span {
+  font-weight: 600;
+}
+.commande-pied {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-top: 8px;
+  border-top: 1px solid #edf1f8;
+}
+.commande-paiement {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--fond);
+  color: var(--texte-moyen);
+}
+.commande-carte {
+  background: #e3f4ea;
+  color: #14552f;
+}
+.commande-total {
+  font-weight: 700;
+  color: var(--bleu-fonce);
+  white-space: nowrap;
+}
+@keyframes alerte-apparition {
+  from {
+    transform: scale(0.96);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .alerte-commande,
+  .commandes-alerte,
+  .commande-nouvelle {
+    animation: none;
+  }
+}
+@media (max-width: 1200px) {
+  .commandes-colonnes {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 700px) {
+  .commandes-colonnes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

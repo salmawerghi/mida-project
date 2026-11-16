@@ -1,18 +1,21 @@
 import { useState, type ReactNode } from 'react'
-import { NavLink } from 'react-router'
+import { Link, NavLink, useLocation } from 'react-router'
 
 import { messageErreur } from './auth/erreurs'
 import { pageDuCompte, type Compte, type Restaurant } from './auth/service'
 import { useSession } from './auth/session'
+import { useCommandes } from './commandes/suivi'
 import { Logo } from './composants'
 
 /**
  * Cadre des pages de l'espace restaurant (maquettes « Restaurant · … ») :
- * menu latéral bleu et contenu à droite. Les autres rubriques (commandes,
- * historique, statistiques) s'ajouteront avec leurs stories.
+ * menu latéral bleu et contenu à droite. Les autres rubriques (historique,
+ * statistiques) s'ajouteront avec leurs stories.
  */
 export default function Cadre({ compte, children }: { compte: Compte; children: ReactNode }) {
   const { service } = useSession()
+  const suivi = useCommandes()
+  const surCommandes = useLocation().pathname === '/commandes'
   const accueil = pageDuCompte(compte)
   const classeLien = ({ isActive }: { isActive: boolean }) => (isActive ? 'cadre-lien cadre-lien-actif' : 'cadre-lien')
   return (
@@ -29,6 +32,20 @@ export default function Cadre({ compte, children }: { compte: Compte; children: 
           <NavLink to={accueil} className={classeLien}>
             {accueil === '/tableau' ? 'Tableau de bord' : 'Ma demande'}
           </NavLink>
+          {suivi.actif && (
+            <NavLink
+              to="/commandes"
+              className={classeLien}
+              aria-label={suivi.aTraiter > 0 ? `Commandes, ${suivi.aTraiter} à traiter` : 'Commandes'}
+            >
+              Commandes
+              {suivi.aTraiter > 0 && (
+                <span className="cadre-pastille" aria-hidden="true">
+                  {suivi.aTraiter}
+                </span>
+              )}
+            </NavLink>
+          )}
           <NavLink to="/menu" className={classeLien}>
             Menu
           </NavLink>
@@ -50,7 +67,22 @@ export default function Cadre({ compte, children }: { compte: Compte; children: 
           </div>
         </div>
       </aside>
-      <main className="cadre-contenu">{children}</main>
+      <main className="cadre-contenu">
+        {suivi.nouvelles.length > 0 && !surCommandes && <AlerteNouvelles nombre={suivi.nouvelles.length} />}
+        {children}
+      </main>
+    </div>
+  )
+}
+
+/** Alerte visuelle d'une nouvelle commande, sur les pages autres que « Commandes » (US12). */
+function AlerteNouvelles({ nombre }: { nombre: number }) {
+  return (
+    <div className="alerte-commande" role="alert">
+      <span>{nombre === 1 ? 'Nouvelle commande reçue !' : `${nombre} nouvelles commandes reçues !`}</span>
+      <Link to="/commandes" className="bouton bouton-blanc bouton-petit">
+        Voir les commandes
+      </Link>
     </div>
   )
 }

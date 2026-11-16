@@ -11,8 +11,8 @@ export default function Tableau({ compte }: { compte: Compte }) {
         <span className="pastille pastille-actif">Restaurant validé</span>
         <h1>Bienvenue, {compte.restaurant?.nom}</h1>
         <p className="texte-doux">
-          Connecté en tant que {compte.nom} ({compte.email}). Les commandes, le menu et les statistiques arrivent ici
-          avec les prochaines versions.
+          Connecté en tant que {compte.nom} ({compte.email}). Les commandes arrivent en temps réel dans « Commandes » ;
+          les statistiques arriveront avec les prochaines versions.
         </p>
         {compte.restaurant && !compte.restaurant.ouvert && (
           <p className="message message-note">
@@ -21,7 +21,10 @@ export default function Tableau({ compte }: { compte: Compte }) {
           </p>
         )}
         <div className="actions" style={{ justifyContent: 'flex-start' }}>
-          <Link to="/menu" className="bouton bouton-bleu">
+          <Link to="/commandes" className="bouton bouton-bleu">
+            Commandes en cours
+          </Link>
+          <Link to="/menu" className="bouton bouton-blanc">
             Votre menu
           </Link>
           <Link to="/profil" className="bouton bouton-blanc">

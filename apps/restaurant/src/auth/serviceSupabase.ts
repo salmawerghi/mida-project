@@ -1,5 +1,13 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
+import {
+  etatsEnCours,
+  nomCourt,
+  type Commande,
+  type EtatCommande,
+  type EvenementCommande,
+} from '../commandes/commandes'
+
 import { supabaseKey, supabaseUrl } from '../config'
 import { messageCategorieExistante, type CategorieMenu } from '../menu/categories'
 import type { InfosPlat, Plat } from '../menu/plats'
@@ -366,6 +374,81 @@ export class ServiceRestaurantSupabase implements ServiceRestaurant {
     const { data, error } = await this.client.from('plats').update({ disponible }).eq('id', platId).select('id')
     if (error) throw error
     if (!data?.length) throw new ErreurMida(messageMenuRefuse)
+  }
+
+  async commandesEnCours(restaurantId: string): Promise<Commande[]> {
+    const { data, error } = await this.client
+      .from('commandes')
+      .select(
+        'id, numero, etat, total, remarque, created_at, acceptee_le, prete_le, ' +
+          'client:profiles!commandes_client_id_fkey(nom), lignes_commande(nom_plat, quantite, remarque), paiements(mode, etat)',
+      )
+      .eq('restaurant_id', restaurantId)
+      .in('etat', etatsEnCours)
+      .order('created_at')
+    if (error) throw error
+    return ((data ?? []) as unknown as LigneCommandeBD[]).map(versCommande)
+  }
+
+  surCommandes(restaurantId: string, rappel: (e: EvenementCommande) => void, surConnexion: () => void): () => void {
+    // Supabase Realtime (migration US12) : seules les commandes que ce compte peut lire arrivent.
+    const canal = this.client
+      .channel(`commandes-${restaurantId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'commandes', filter: `restaurant_id=eq.${restaurantId}` },
+        (changement) => {
+          const ligne = (changement.eventType === 'DELETE' ? changement.old : changement.new) as {
+            id?: string
+            etat?: EtatCommande
+          }
+          rappel({ type: changement.eventType, id: ligne.id ?? null, etat: ligne.etat ?? null })
+        },
+      )
+      .subscribe((statut) => {
+        if (statut === 'SUBSCRIBED') surConnexion()
+      })
+    return () => {
+      void this.client.removeChannel(canal)
+    }
+  }
+}
+
+interface LigneCommandeBD {
+  id: string
+  numero: number | string
+  etat: EtatCommande
+  total: number | string
+  remarque: string | null
+  created_at: string
+  acceptee_le: string | null
+  prete_le: string | null
+  client: { nom: string } | { nom: string }[] | null
+  lignes_commande: { nom_plat: string; quantite: number; remarque: string | null }[] | null
+  // paiements.commande_id est unique : PostgREST renvoie un objet (un tableau par prudence)
+  paiements: NonNullable<Commande['paiement']> | NonNullable<Commande['paiement']>[] | null
+}
+
+function premier<T>(valeur: T | T[] | null): T | null {
+  return Array.isArray(valeur) ? (valeur[0] ?? null) : valeur
+}
+
+function versCommande(l: LigneCommandeBD): Commande {
+  const creeeLe = new Date(l.created_at)
+  const depuis = { en_attente: null, acceptee: l.acceptee_le, en_preparation: l.acceptee_le, prete: l.prete_le }[
+    l.etat as 'en_attente' | 'acceptee' | 'en_preparation' | 'prete'
+  ]
+  return {
+    id: l.id,
+    numero: Number(l.numero),
+    etat: l.etat,
+    client: nomCourt(premier(l.client)?.nom ?? ''),
+    total: Number(l.total),
+    remarque: l.remarque,
+    creeeLe,
+    depuisLe: depuis ? new Date(depuis) : l.etat === 'en_livraison' && l.prete_le ? new Date(l.prete_le) : creeeLe,
+    lignes: (l.lignes_commande ?? []).map((x) => ({ nomPlat: x.nom_plat, quantite: x.quantite, remarque: x.remarque })),
+    paiement: premier(l.paiements),
   }
 }
 

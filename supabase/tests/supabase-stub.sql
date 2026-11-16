@@ -79,3 +79,6 @@ $$;
 grant usage on schema storage to anon, authenticated, service_role;
 grant all on storage.objects to anon, authenticated, service_role;
 grant select on storage.buckets to anon, authenticated, service_role;
+
+-- Publication du temps réel (Supabase Realtime) : existe déjà sur un vrai projet
+create publication supabase_realtime;

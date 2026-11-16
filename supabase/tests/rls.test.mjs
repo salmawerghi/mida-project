@@ -810,3 +810,37 @@ test('US11 · un plat indisponible ne peut pas être commandé', async () => {
     await fin();
   }
 });
+
+// =====================================================================
+// US12 — nouvelles commandes en temps réel
+// =====================================================================
+test('US12 · les commandes sont diffusées en temps réel', async () => {
+  const tables = await lignes(`select tablename from pg_publication_tables where pubname = 'supabase_realtime'`);
+  assert.deepEqual(tables, [{ tablename: 'commandes' }]);
+});
+
+test('US12 · le restaurant lit le détail de ses commandes : plats, paiement, nom du client', async () => {
+  // la requête de l'espace restaurant (commandes en cours, avec leur détail)
+  const detail = `select c.numero, p.nom as client, pa.mode::text as paiement,
+                         string_agg(l.quantite || ' × ' || l.nom_plat, ', ' order by l.nom_plat) as plats,
+                         max(l.remarque) as remarque
+                  from public.commandes c
+                  join public.profiles p on p.id = c.client_id
+                  left join public.paiements pa on pa.commande_id = c.id
+                  join public.lignes_commande l on l.commande_id = c.id
+                  where c.numero = $1
+                  group by c.numero, p.nom, pa.mode`;
+  await en('zitouna', async () => {
+    const [c] = await lignes(detail, [1045]);
+    assert.equal(c.plats, '1 × Couscous à l\'agneau, 2 × Thé à la menthe');
+    assert.equal(c.paiement, 'especes');
+    assert.equal(c.remarque, 'Piquant : moyen');
+    assert.ok(c.client, 'le nom du client est visible du restaurant');
+    // pas les commandes d'un autre restaurant (1046 : El Kanoun)
+    assert.deepEqual(await lignes(detail, [1046]), []);
+  });
+  // ni celles des autres clients
+  await en('amine', async () => {
+    assert.deepEqual(await lignes(detail, [1045]), []);
+  });
+});

@@ -10,6 +10,7 @@ import type {
   ResultatPlat,
   ServiceRestaurant,
 } from '../auth/service'
+import type { Commande, EtatCommande, EvenementCommande } from '../commandes/commandes'
 import type { CategorieMenu } from '../menu/categories'
 import type { InfosPlat, Plat } from '../menu/plats'
 import { horairesParDefaut, type Horaire } from '../profil/horaires'
@@ -119,6 +120,68 @@ export class FauxService implements ServiceRestaurant {
     if (this.erreurPlat) throw this.erreurPlat
     this.plats = this.plats.map((p) => (p.id === platId ? { ...p, disponible } : p))
   })
+
+  /** Commandes en cours gardées en mémoire (US12) ; `maintenant` des tests : 2026-11-16 12:00. */
+  commandes: Commande[] = [
+    {
+      id: 'k1045',
+      numero: 1045,
+      etat: 'en_attente',
+      client: 'Youssef K.',
+      total: 23,
+      remarque: null,
+      creeeLe: new Date('2026-11-16T11:57:00'),
+      depuisLe: new Date('2026-11-16T11:57:00'),
+      lignes: [
+        { nomPlat: 'Couscous à l’agneau', quantite: 1, remarque: 'Piquant : moyen' },
+        { nomPlat: 'Thé à la menthe', quantite: 2, remarque: null },
+      ],
+      paiement: { mode: 'carte', etat: 'paye' },
+    },
+    {
+      id: 'k1044',
+      numero: 1044,
+      etat: 'en_preparation',
+      client: 'Leïla M.',
+      total: 50.5,
+      remarque: 'Sonner deux fois',
+      creeeLe: new Date('2026-11-16T11:48:00'),
+      depuisLe: new Date('2026-11-16T11:51:00'),
+      lignes: [{ nomPlat: 'Tajine de poulet aux olives', quantite: 3, remarque: null }],
+      paiement: { mode: 'especes', etat: 'en_attente' },
+    },
+  ]
+  erreurCommandes: unknown = null
+  private abonnes: { rappel: (e: EvenementCommande) => void; surConnexion: () => void }[] = []
+
+  commandesEnCours = vi.fn(async (_restaurant: string) => {
+    if (this.erreurCommandes) throw this.erreurCommandes
+    return [...this.commandes]
+  })
+
+  surCommandes = vi.fn((_restaurant: string, rappel: (e: EvenementCommande) => void, surConnexion: () => void) => {
+    const abonne = { rappel, surConnexion }
+    this.abonnes.push(abonne)
+    return () => {
+      this.abonnes = this.abonnes.filter((a) => a !== abonne)
+    }
+  })
+
+  get nbAbonnes(): number {
+    return this.abonnes.length
+  }
+
+  /** Simule une commande passée par un client (événement temps réel). */
+  simulerCommande(commande: Commande) {
+    this.commandes = [...this.commandes, commande]
+    for (const a of this.abonnes) a.rappel({ type: 'INSERT', id: commande.id, etat: commande.etat })
+  }
+
+  /** Simule un changement d'état (par exemple par la future fonction « accepter »). */
+  simulerChangement(id: string, etat: EtatCommande) {
+    this.commandes = this.commandes.map((c) => (c.id === id ? { ...c, etat } : c))
+    for (const a of this.abonnes) a.rappel({ type: 'UPDATE', id, etat })
+  }
 
   erreurOuverture: unknown = null
   changerOuverture = vi.fn(async (_id: string, ouvert: boolean) => {

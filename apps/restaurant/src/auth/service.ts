@@ -1,5 +1,6 @@
 /** Opérations de compte utilisées par les écrans (remplaçables dans les tests). */
 
+import type { Commande, EvenementCommande } from '../commandes/commandes'
 import type { CategorieMenu } from '../menu/categories'
 import type { InfosPlat, Plat } from '../menu/plats'
 import type { Horaire } from '../profil/horaires'
@@ -113,6 +114,14 @@ export interface ServiceRestaurant {
   supprimerPlat(restaurantId: string, plat: Plat): Promise<void>
   /** Rend un plat momentanément indisponible, ou le réactive (US11). */
   changerDisponibilite(platId: string, disponible: boolean): Promise<void>
+
+  /** Commandes en cours du restaurant (en attente → en livraison), avec leur détail (US12). */
+  commandesEnCours(restaurantId: string): Promise<Commande[]>
+  /**
+   * S'abonne aux changements des commandes du restaurant, en temps réel.
+   * `surConnexion` est appelé à chaque (re)connexion. Renvoie de quoi se désabonner.
+   */
+  surCommandes(restaurantId: string, rappel: (e: EvenementCommande) => void, surConnexion: () => void): () => void
 }
 
 export interface ResultatPlat {

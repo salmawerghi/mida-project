@@ -37,8 +37,9 @@ apps/
 | US12 | Commandes en cours (espace web, page « Commandes ») : 4 colonnes (en attente, en préparation, prête, en livraison), nouvelles commandes en temps réel avec alerte sonore et visuelle, détail (plats, quantités, remarques, paiement) | fait : 15 tests Vitest + 2 tests PGlite, migration appliquée sur Supabase ; essayé avec deux commandes de test créées par SQL (n° 1001 en espèces, n° 1003 par carte) : arrivée en temps réel, son, bandeaux et pastille OK |
 | US13 | Accepter ou refuser une commande (espace web) : boutons sur les commandes en attente, fenêtre de refus avec motif obligatoire (4 motifs proposés + message au client), client prévenu par une notification, paiement par carte remboursé | fait : 8 tests Vitest + 4 tests PGlite, fonctions appliquées sur Supabase ; essayé avec le vrai projet (n° 1001 acceptée, n° 1003 refusée et remboursée, notifications créées) ; affichage des notifications dans l'appli client à venir |
 | US14 | Faire avancer une commande (espace web) : « Commencer la préparation » (acceptée → en préparation) puis « Marquer comme prête », une étape par clic, sans saut ni retour en arrière ; client prévenu à chaque étape | codé : 4 tests Vitest + 3 tests PGlite, fonction appliquée sur Supabase ; essai réel à faire (commande de test 1001) |
+| US15 | Catalogue de l'appli client : restaurants validés (ouverts d'abord), avec logo, catégorie, ville, note moyenne et nombre d'avis, état ouvert / fermé, délai ; aussi pour les visiteurs | codé : 6 tests Flutter + 1 test PGlite, vue appliquée sur Supabase ; essai réel à faire |
 
-US01 à US03, US08, US09 et US11 à US14 sont appliquées sur le projet Supabase de Mida (`tpfpuwlgnxhwhezicuto`) ; le jeu de test n'y est pas encore chargé.
+US01 à US03, US08, US09 et US11 à US15 sont appliquées sur le projet Supabase de Mida (`tpfpuwlgnxhwhezicuto`) ; le jeu de test n'y est pas encore chargé.
 
 ## Appliquer sur un projet Supabase
 
@@ -120,6 +121,13 @@ flutter run         # se connecte au projet Supabase de Mida (lib/config.dart)
 - Les comptes livreur, responsable, admin ou bloqués sont déconnectés aussitôt avec un message qui indique la bonne application.
 - « Confirm email » est **désactivé** sur le projet Mida (essais) : l'inscription ouvre directement la session. À réactiver avant une vraie mise en service.
 - Essai du 14/11/2026 sur émulateur Android (Pixel 7) : inscription, ligne `profiles` créée (rôle `client`, téléphone `+216 22 145 870`), session conservée après fermeture de l'appli, déconnexion, mauvais mot de passe, connexion. Compte d'essai : `test.us04@mida.test` / `Us04Mida7k2q`. Pas encore essayé : le refus d'un compte livreur/responsable (aucun compte de ce type en ligne tant que `seed.sql` n'est pas chargé).
+### Catalogue des restaurants (US15)
+
+- L'accueil (`lib/pages/accueil_page.dart`) est le catalogue, pour les clients connectés comme pour les visiteurs. Chaque carte (`lib/widgets/catalogue.dart`) montre le logo (ou une illustration Mida si le restaurant n'en a pas), le nom, la catégorie et la ville, la pastille **Ouvert / Fermé** (un restaurant fermé reste visible mais grisé), la note moyenne « ★ 4,8 (12 avis) » ou « Nouveau », et le délai estimé (temps de préparation + 10 min).
+- Ordre : ouverts d'abord, puis les mieux notés, puis par nom. Tirer vers le bas recharge la liste.
+- Données (`lib/donnees/service_mida.dart`) : `restaurants` filtrés sur `etat = actif` (la RLS ne montre déjà que ceux-là) avec `categories_restaurant(nom)`, et la vue **`notes_restaurants`** (migration `20261116000005`, `security_invoker`) : note moyenne arrondie à 0,1 et nombre d'avis par restaurant.
+- Les services sont fournis à tous les écrans par `Dependances.of(context)` (`lib/dependances.dart`) ; les tests utilisent `test/faux_service_mida.dart`.
+
 - Si la compilation Android échoue sur le cache Kotlin (« Could not close incremental caches ») : c'est le projet sur `D:` et le cache pub sur `C:` ; `kotlin.incremental=false` est déjà dans `android/gradle.properties`.
 
 ## Espace restaurant web (US05)

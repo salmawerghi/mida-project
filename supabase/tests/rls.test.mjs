@@ -993,3 +993,28 @@ test('US14 · seul le restaurant de la commande la fait avancer', async () => {
     assert.equal((await etatDe(C_1044)).etat, 'prete');
   });
 });
+
+// =====================================================================
+// US15 — catalogue de l'appli client
+// =====================================================================
+test('US15 · le catalogue : restaurants validés seulement, avec leur note et leur catégorie', async () => {
+  const ajout = `insert into public.avis (commande_id, client_id, restaurant_id, note)
+                 values ('${C_1044}', '${'c0000000-0000-4000-8000-000000000002'}', '${R_ZITOUNA}', 4)`;
+  for (const lecteur of [null, 'amine']) {
+    await en(lecteur, async () => {
+      // la requête de l'appli : restaurants validés, catégorie, note moyenne
+      const restaurants = (await lignes(`select r.nom, k.nom as categorie, r.ouvert, n.note::text, n.nb_avis
+                                         from public.restaurants r
+                                         left join public.categories_restaurant k on k.id = r.categorie_id
+                                         left join public.notes_restaurants n on n.restaurant_id = r.id
+                                         where r.etat = 'actif' order by r.nom`));
+      assert.ok(!restaurants.some((r) => r.nom === 'Lella Béya'), 'restaurant en attente : invisible');
+      const zitouna = restaurants.find((r) => r.nom === 'Dar Zitouna');
+      assert.deepEqual({ note: zitouna.note, nb: zitouna.nb_avis }, { note: '4.5', nb: 2 });
+      // sans avis : pas de note
+      assert.equal(restaurants.find((r) => r.nom === 'El Kanoun').note, null);
+      // les catégories servent au filtre (US16)
+      assert.ok((await lignes(`select nom from public.categories_restaurant`)).length > 0);
+    }, ajout);
+  }
+});

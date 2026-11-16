@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240">
+  <defs>
+    <linearGradient id="crust" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FBD27A"/><stop offset="0.55" stop-color="#EBA23A"/><stop offset="1" stop-color="#B9681A"/>
+    </linearGradient>
+    <radialGradient id="plate" cx="0.4" cy="0.3" r="0.9">
+      <stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#DDE5F2"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="120" cy="204" rx="90" ry="14" fill="#0F1B33" opacity="0.18"/>
+  <ellipse cx="120" cy="158" rx="104" ry="46" fill="#B9C6DC"/>
+  <ellipse cx="120" cy="150" rx="104" ry="46" fill="url(#plate)"/>
+  <ellipse cx="120" cy="150" rx="88" ry="37" fill="none" stroke="#1554C0" stroke-width="4"/>
+  <ellipse cx="120" cy="150" rx="80" ry="32" fill="none" stroke="#1554C0" stroke-width="1.5" stroke-dasharray="3 6"/>
+  <path d="M52 158 L160 92 Q170 88 174 98 L192 156 Q194 168 182 170 Q110 184 58 172 Q44 168 52 158 Z" fill="#8F4D10"/>
+  <path d="M52 150 L160 84 Q170 80 174 90 L192 148 Q194 160 182 162 Q110 176 58 164 Q44 160 52 150 Z" fill="url(#crust)"/>
+  <path d="M96 138 Q128 112 160 126 Q166 146 140 156 Q108 160 96 138 Z" fill="#FCE2A2" opacity="0.6"/>
+  <path d="M70 152 L156 100 M84 160 L166 114 M112 166 L178 132" stroke="#C97A1E" stroke-width="2.5" stroke-linecap="round" opacity="0.7"/>
+  <path d="M36 128 Q40 104 66 104 L62 136 Q46 138 36 128 Z" fill="#F6D948"/>
+  <path d="M42 126 Q46 110 62 110 L59 131 Q49 132 42 126 Z" fill="#FBEB8C"/>
+  <circle cx="118" cy="128" r="3.5" fill="#4C9A3C"/><circle cx="140" cy="140" r="3.5" fill="#4C9A3C"/><circle cx="104" cy="150" r="3.5" fill="#4C9A3C"/><circle cx="154" cy="120" r="3" fill="#4C9A3C"/>
+</svg>

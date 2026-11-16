@@ -8,6 +8,7 @@ import {
   colonnes,
   composerMotif,
   duree,
+  etapeSuivante,
   ilYa,
   libelleATraiter,
   libellePaiement,
@@ -29,7 +30,7 @@ const dureeMiseEnAvant = 15_000
  * Commandes en cours (maquette « Restaurant · Commandes en cours ») : les
  * nouvelles commandes arrivent en temps réel, avec une alerte sonore et
  * visuelle (US12) ; le responsable les accepte ou les refuse avec un motif
- * (US13). « Prête » : US14.
+ * (US13), puis la font avancer : en préparation, prête (US14).
  */
 export default function Commandes({ compte }: { compte: Compte }) {
   const { service } = useSession()
@@ -82,6 +83,16 @@ export default function Commandes({ compte }: { compte: Compte }) {
       commande,
       () => service.accepterCommande(commande.id),
       `Commande n° ${commande.numero} acceptée : le client est prévenu. Elle passe en préparation.`,
+    )
+  }
+
+  function avancer(commande: Commande, etat: 'en_preparation' | 'prete') {
+    void decider(
+      commande,
+      () => service.avancerCommande(commande.id, etat),
+      etat === 'prete'
+        ? `Commande n° ${commande.numero} prête : le client est prévenu.`
+        : `Commande n° ${commande.numero} : préparation commencée.`,
     )
   }
 
@@ -171,6 +182,7 @@ export default function Commandes({ compte }: { compte: Compte }) {
                       enCours={enCours === c.id}
                       bloque={enCours !== null}
                       onAccepter={() => accepter(c)}
+                      onAvancer={(etat) => avancer(c, etat)}
                       onRefuser={() => {
                         setErreurAction(null)
                         setConfirmation(null)
@@ -208,6 +220,7 @@ function CarteCommande({
   enCours,
   bloque,
   onAccepter,
+  onAvancer,
   onRefuser,
 }: {
   commande: Commande
@@ -216,8 +229,10 @@ function CarteCommande({
   enCours: boolean
   bloque: boolean
   onAccepter: () => void
+  onAvancer: (etat: 'en_preparation' | 'prete') => void
   onRefuser: () => void
 }) {
+  const suivante = etapeSuivante(c.etat)
   const temps = c.etat === 'en_attente' ? ilYa(c.creeeLe, maintenant) : duree(c.depuisLe, maintenant)
   return (
     <article className={nouvelle ? 'commande commande-nouvelle' : 'commande'} aria-label={`Commande n° ${c.numero}`}>
@@ -227,6 +242,11 @@ function CarteCommande({
         </span>
         <span className="commande-temps">{nouvelle ? 'Nouvelle !' : temps}</span>
       </div>
+      {(c.etat === 'acceptee' || c.etat === 'en_preparation') && (
+        <span className={c.etat === 'acceptee' ? 'commande-etat' : 'commande-etat commande-etat-cuisine'}>
+          {c.etat === 'acceptee' ? 'Acceptée · à préparer' : 'En cuisine'}
+        </span>
+      )}
       <ul className="commande-lignes">
         {c.lignes.map((l, i) => (
           <li key={i}>
@@ -265,6 +285,20 @@ function CarteCommande({
             aria-label={`Refuser la commande n° ${c.numero}`}
           >
             Refuser
+          </Bouton>
+        </div>
+      )}
+      {suivante && (
+        <div className="commande-actions">
+          <Bouton
+            variante={suivante.etat === 'prete' ? 'bleu' : 'blanc'}
+            className="bouton-petit"
+            enCours={enCours}
+            disabled={bloque}
+            onClick={() => onAvancer(suivante.etat)}
+            aria-label={`${suivante.bouton} : commande n° ${c.numero}`}
+          >
+            {suivante.bouton}
           </Bouton>
         </div>
       )}

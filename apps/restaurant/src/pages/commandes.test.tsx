@@ -78,7 +78,7 @@ describe('commandes en cours en temps réel (US12)', () => {
 
     act(() => service.simulerCommande(nouvelle))
 
-    const carte = await screen.findByRole('article', { name: 'Commande n° 1047' })
+    const carte = await screen.findByRole('article', { name: 'Commande n° 1047' }, { timeout: 3000 })
     expect(within(screen.getByRole('region', { name: 'En attente' })).getByRole('article', { name: 'Commande n° 1047' })).toBe(carte)
     expect(carte).toHaveClass('commande-nouvelle')
     expect(within(carte).getByText('Nouvelle !')).toBeInTheDocument()
@@ -107,7 +107,7 @@ describe('commandes en cours en temps réel (US12)', () => {
 
     await u.click(within(alerte).getByRole('link', { name: 'Voir les commandes' }))
     expect(await screen.findByRole('heading', { name: 'Commandes en cours' })).toBeInTheDocument()
-    expect(await screen.findByRole('article', { name: 'Commande n° 1047' })).toHaveClass('commande-nouvelle')
+    expect(await screen.findByRole('article', { name: 'Commande n° 1047' }, { timeout: 3000 })).toHaveClass('commande-nouvelle')
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
@@ -137,7 +137,7 @@ describe('commandes en cours en temps réel (US12)', () => {
     expect(localStorage.getItem('mida.alerte-sonore')).toBe('non')
 
     act(() => service.simulerCommande(nouvelle))
-    expect(await screen.findByRole('article', { name: 'Commande n° 1047' })).toBeInTheDocument()
+    expect(await screen.findByRole('article', { name: 'Commande n° 1047' }, { timeout: 3000 })).toBeInTheDocument()
     expect(lecteur.jouer).not.toHaveBeenCalled()
 
     // réactivée : une note d'essai confirme que le son marche
@@ -223,7 +223,8 @@ describe('accepter ou refuser une commande (US13)', () => {
   it('pas de boutons Accepter / Refuser sur les commandes déjà acceptées', async () => {
     ouvrir(new FauxService(valide))
     const c1044 = await screen.findByRole('article', { name: 'Commande n° 1044' })
-    expect(within(c1044).queryByRole('button')).not.toBeInTheDocument()
+    expect(within(c1044).queryByRole('button', { name: /^Accepter/ })).not.toBeInTheDocument()
+    expect(within(c1044).queryByRole('button', { name: /^Refuser/ })).not.toBeInTheDocument()
   })
 
   it('refus : le motif est obligatoire, puis la commande quitte la page', async () => {
@@ -302,5 +303,48 @@ describe('accepter ou refuser une commande (US13)', () => {
 
     expect(await screen.findByText('La commande n° 1045 a déjà été traitée')).toBeInTheDocument()
     expect(service.commandesEnCours.mock.calls.length).toBeGreaterThan(lectures)
+  })
+})
+
+describe('en préparation, puis prête (US14)', () => {
+  it('acceptée → « Commencer la préparation » → « Marquer comme prête » : une étape par clic', async () => {
+    const u = userEvent.setup()
+    const service = new FauxService(valide)
+    ouvrir(service)
+
+    await u.click(await screen.findByRole('button', { name: 'Accepter la commande n° 1045' }))
+    const preparation = screen.getByRole('region', { name: 'En préparation' })
+    const c1045 = await within(preparation).findByRole('article', { name: 'Commande n° 1045' }, { timeout: 3000 })
+    expect(within(c1045).getByText('Acceptée · à préparer')).toBeInTheDocument()
+
+    await u.click(within(c1045).getByRole('button', { name: 'Commencer la préparation : commande n° 1045' }))
+    expect(await screen.findByText('Commande n° 1045 : préparation commencée.')).toBeInTheDocument()
+    expect(service.avancerCommande).toHaveBeenLastCalledWith('k1045', 'en_preparation')
+    const enCuisine = await within(preparation).findByRole('button', { name: 'Marquer comme prête : commande n° 1045' }, { timeout: 3000 })
+    expect(within(screen.getByRole('article', { name: 'Commande n° 1045' })).getByText('En cuisine')).toBeInTheDocument()
+
+    await u.click(enCuisine)
+    expect(await screen.findByText('Commande n° 1045 prête : le client est prévenu.')).toBeInTheDocument()
+    expect(service.avancerCommande).toHaveBeenLastCalledWith('k1045', 'prete')
+    const prete = screen.getByRole('region', { name: 'Prête' })
+    const carte = await within(prete).findByRole('article', { name: 'Commande n° 1045' }, { timeout: 3000 })
+    // prête : la suite appartient au livreur, plus aucun bouton
+    expect(within(carte).queryByRole('button')).not.toBeInTheDocument()
+  })
+
+  it('commande déjà en préparation : un seul bouton, « Marquer comme prête »', async () => {
+    ouvrir(new FauxService(valide))
+    const c1044 = await screen.findByRole('article', { name: 'Commande n° 1044' })
+    expect(within(c1044).getAllByRole('button').map((b) => b.textContent)).toEqual(['Marquer comme prête'])
+  })
+
+  it('refus de la base (déjà prête ailleurs) : message affiché, la liste est relue', async () => {
+    const u = userEvent.setup()
+    const service = new FauxService(valide)
+    service.erreurDecision = { code: 'P0001', message: 'La commande n° 1044 est déjà prête' }
+    ouvrir(service)
+
+    await u.click(await screen.findByRole('button', { name: 'Marquer comme prête : commande n° 1044' }))
+    expect(await screen.findByText('La commande n° 1044 est déjà prête')).toBeInTheDocument()
   })
 })

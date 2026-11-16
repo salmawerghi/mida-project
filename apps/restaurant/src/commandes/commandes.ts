@@ -114,3 +114,10 @@ export function composerMotif(motif: MotifRefus, message: string): string {
 export function resumePlats(commande: Commande): string {
   return commande.lignes.map((l) => `${l.quantite} × ${l.nomPlat}`).join(', ')
 }
+
+/** Étape suivante proposée au restaurant (US14) : acceptée → en préparation → prête. */
+export function etapeSuivante(etat: EtatCommande): { etat: 'en_preparation' | 'prete'; bouton: string } | null {
+  if (etat === 'acceptee') return { etat: 'en_preparation', bouton: 'Commencer la préparation' }
+  if (etat === 'en_preparation') return { etat: 'prete', bouton: 'Marquer comme prête' }
+  return null
+}

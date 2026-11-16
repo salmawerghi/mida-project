@@ -1,6 +1,25 @@
 import { describe, expect, it } from 'vitest'
 
-import { composerMotif, duree, ilYa, libelleATraiter, libellePaiement, nomCourt, validerRefus } from './commandes'
+import {
+  composerMotif,
+  duree,
+  etapeSuivante,
+  ilYa,
+  libelleATraiter,
+  libellePaiement,
+  nomCourt,
+  validerRefus,
+} from './commandes'
+
+describe('étapes de la commande (US14)', () => {
+  it('une seule étape suivante, dans l’ordre, jamais en arrière', () => {
+    expect(etapeSuivante('acceptee')?.etat).toBe('en_preparation')
+    expect(etapeSuivante('en_preparation')?.etat).toBe('prete')
+    for (const etat of ['en_attente', 'prete', 'en_livraison', 'livree', 'refusee', 'annulee'] as const) {
+      expect(etapeSuivante(etat)).toBeNull()
+    }
+  })
+})
 
 describe('refus d’une commande (US13)', () => {
   it('motif obligatoire, message obligatoire pour « Autre motif »', () => {

@@ -423,6 +423,12 @@ export class ServiceRestaurantSupabase implements ServiceRestaurant {
     const { error } = await this.client.rpc('refuser_commande', { p_commande: commandeId, p_motif: motif })
     if (error) throw error
   }
+
+  async avancerCommande(commandeId: string, etat: 'en_preparation' | 'prete'): Promise<void> {
+    // Fonction de la base (migration US14) : une étape à la fois, sans retour en arrière.
+    const { error } = await this.client.rpc('avancer_commande', { p_commande: commandeId, p_etat: etat })
+    if (error) throw error
+  }
 }
 
 interface LigneCommandeBD {

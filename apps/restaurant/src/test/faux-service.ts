@@ -197,6 +197,11 @@ export class FauxService implements ServiceRestaurant {
     this.commandes = this.commandes.filter((c) => c.id !== id)
   })
 
+  avancerCommande = vi.fn(async (id: string, etat: 'en_preparation' | 'prete') => {
+    if (this.erreurDecision) throw this.erreurDecision
+    this.simulerChangement(id, etat)
+  })
+
   erreurOuverture: unknown = null
   changerOuverture = vi.fn(async (_id: string, ouvert: boolean) => {
     if (this.erreurOuverture) throw this.erreurOuverture

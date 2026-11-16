@@ -1384,3 +1384,18 @@ textarea.saisie {
     padding: 20px 16px;
   }
 }
+
+/* ---------- En préparation, prête (US14) ---------- */
+.commande-etat {
+  align-self: flex-start;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--bleu-clair);
+  color: var(--bleu-fonce);
+}
+.commande-etat-cuisine {
+  background: var(--dore-clair);
+  color: #6b4a00;
+}

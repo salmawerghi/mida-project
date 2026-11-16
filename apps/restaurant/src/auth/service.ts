@@ -126,6 +126,8 @@ export interface ServiceRestaurant {
   accepterCommande(commandeId: string): Promise<void>
   /** Refuse une commande en attente avec un motif (obligatoire) ; le client est prévenu, la carte remboursée. */
   refuserCommande(commandeId: string, motif: string): Promise<void>
+  /** Fait avancer une commande d'une étape : acceptée → en préparation → prête (US14). */
+  avancerCommande(commandeId: string, etat: 'en_preparation' | 'prete'): Promise<void>
 }
 
 export interface ResultatPlat {

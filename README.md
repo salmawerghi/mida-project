@@ -36,8 +36,9 @@ apps/
 | US11 | Plat momentanément indisponible (espace web) : case « Disponible » sur chaque plat du menu, un clic pour le retirer de la commande ou le réactiver ; un plat indisponible ne peut pas être commandé | fait : 4 tests Vitest + 2 tests PGlite, migration appliquée sur Supabase, essayé avec le vrai projet ; affichage grisé dans l'appli client avec le catalogue |
 | US12 | Commandes en cours (espace web, page « Commandes ») : 4 colonnes (en attente, en préparation, prête, en livraison), nouvelles commandes en temps réel avec alerte sonore et visuelle, détail (plats, quantités, remarques, paiement) | fait : 15 tests Vitest + 2 tests PGlite, migration appliquée sur Supabase ; essayé avec deux commandes de test créées par SQL (n° 1001 en espèces, n° 1003 par carte) : arrivée en temps réel, son, bandeaux et pastille OK |
 | US13 | Accepter ou refuser une commande (espace web) : boutons sur les commandes en attente, fenêtre de refus avec motif obligatoire (4 motifs proposés + message au client), client prévenu par une notification, paiement par carte remboursé | fait : 8 tests Vitest + 4 tests PGlite, fonctions appliquées sur Supabase ; essayé avec le vrai projet (n° 1001 acceptée, n° 1003 refusée et remboursée, notifications créées) ; affichage des notifications dans l'appli client à venir |
+| US14 | Faire avancer une commande (espace web) : « Commencer la préparation » (acceptée → en préparation) puis « Marquer comme prête », une étape par clic, sans saut ni retour en arrière ; client prévenu à chaque étape | codé : 4 tests Vitest + 3 tests PGlite, fonction appliquée sur Supabase ; essai réel à faire (commande de test 1001) |
 
-US01 à US03, US08, US09, US11, US12 et US13 sont appliquées sur le projet Supabase de Mida (`tpfpuwlgnxhwhezicuto`) ; le jeu de test n'y est pas encore chargé.
+US01 à US03, US08, US09 et US11 à US14 sont appliquées sur le projet Supabase de Mida (`tpfpuwlgnxhwhezicuto`) ; le jeu de test n'y est pas encore chargé.
 
 ## Appliquer sur un projet Supabase
 
@@ -196,6 +197,12 @@ Page `/profil` (`src/pages/Profil.tsx`), dans le cadre à menu latéral (`src/Ca
   - refuser : `etat = refusee`, `motif_refus` ; un paiement par **carte déjà payé** passe à `rembourse` (le vrai remboursement auprès de la passerelle viendra avec la story du paiement) ;
   - dans les deux cas, une **notification** est créée pour le client (« Commande acceptée » / « Commande refusée », avec le motif et le montant remboursé). L'appli client les affichera ; le changement d'état est aussi diffusé en temps réel (US12).
 - Les fonctions sont `security definer` (elles écrivent dans `commandes`, interdite aux applications) et réservées aux comptes connectés (`anon` n'y a pas accès). L'outil de sécurité de Supabase les signale (« Signed-In Users Can Execute SECURITY DEFINER Function ») : c'est voulu, car ce sont les seules portes d'entrée, et elles contrôlent elles-mêmes le restaurant et l'état.
+
+### En préparation, puis prête (US14)
+
+- Dans la colonne « En préparation », une commande **acceptée** porte l'étiquette « Acceptée · à préparer » et le bouton **« Commencer la préparation »** ; une commande **en préparation** porte « En cuisine » et le bouton **« Marquer comme prête »**. Une fois prête, elle passe dans la colonne « Prête », sans bouton : la suite (récupération, livraison) appartient au livreur.
+- **Base** (migration `20261116000004`) : `avancer_commande(p_commande, p_etat)`, où `p_etat` est l'état **visé** (`en_preparation` ou `prete`). La fonction n'accepte que `acceptee → en_preparation` et `en_preparation → prete` : pas de saut d'étape, pas de retour en arrière, aucun autre état (« Le restaurant ne peut faire passer une commande qu'à « en préparation » ou « prête » »). Comme l'état visé est indiqué, un double clic ou un onglet resté ouvert ne fait jamais avancer la commande de deux étapes (« La commande n° … est déjà prête »). `prete_le` est enregistrée, et le client reçoit une notification à chaque étape (« Commande en préparation », « Commande prête »). Mêmes contrôles qu'US13 (commande du restaurant du responsable connecté, verrou).
+- Pas encore fait : proposer la course aux livreurs quand la commande est prête (stories du livreur).
 
 ## Mot de passe oublié (US06) — en attente du réglage e-mail
 

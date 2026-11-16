@@ -933,3 +933,63 @@ test('US13 · seul le restaurant de la commande décide, et seulement tant qu\'e
   });
   assert.equal((await etatDe(C_1045)).etat, 'en_attente');
 });
+
+// =====================================================================
+// US14 — en préparation, puis prête
+// =====================================================================
+const C_1044 = '60000000-0000-4000-8000-000000001044';           // en préparation (Dar Zitouna, cliente Leïla)
+const avancer = (id, etat) => requete(`select public.avancer_commande($1, $2)`, [id, etat]);
+
+test('US14 · acceptée → en préparation → prête, le client est prévenu à chaque étape', async () => {
+  await en('zitouna', async () => {
+    await requete(`select public.accepter_commande($1)`, [C_1045]);
+    await avancer(C_1045, 'en_preparation');
+    assert.equal((await etatDe(C_1045)).etat, 'en_preparation');
+    await avancer(C_1045, 'prete');
+    const [c] = await lignes(`select etat::text, prete_le is not null as datee from public.commandes where id = $1`, [C_1045]);
+    assert.deepEqual(c, { etat: 'prete', datee: true });
+    await db.exec('reset role');
+    const notifs = await lignes(`select titre, message from public.notifications
+                                 where commande_id = $1 and destinataire_id = $2 order by created_at, titre`, [C_1045, ids.youssef]);
+    assert.deepEqual(notifs.map((n) => n.titre).sort(), ['Commande acceptée', 'Commande en préparation', 'Commande prête']);
+    assert.ok(notifs.some((n) => n.message === 'Votre commande n° 1045 est prête chez Dar Zitouna : elle va bientôt partir en livraison.'));
+  });
+});
+
+test('US14 · les états se suivent dans l\'ordre : pas de saut, pas de retour en arrière', async () => {
+  await en('zitouna', async () => {
+    // en attente : il faut d'abord l'accepter
+    await assert.rejects(avancer(C_1045, 'en_preparation'), /ne peut pas passer à « en préparation »/);
+    await requete(`select public.accepter_commande($1)`, [C_1045]);
+    // acceptée : pas directement « prête »
+    await assert.rejects(avancer(C_1045, 'prete'), /ne peut pas passer à « prête »/);
+    await avancer(C_1045, 'en_preparation');
+    // double clic : déjà fait
+    await assert.rejects(avancer(C_1045, 'en_preparation'), /n° 1045 est déjà en préparation/);
+    await avancer(C_1045, 'prete');
+    await assert.rejects(avancer(C_1045, 'prete'), /déjà prête/);
+    // retour en arrière impossible
+    await assert.rejects(avancer(C_1045, 'en_preparation'), /ne peut pas passer/);
+    // états réservés au livreur, à l'administrateur ou aux autres fonctions
+    for (const etat of ['en_livraison', 'livree', 'acceptee', 'en_attente', 'refusee', 'annulee']) {
+      await assert.rejects(avancer(C_1045, etat), /qu'à « en préparation » ou « prête »/);
+    }
+    assert.equal((await etatDe(C_1045)).etat, 'prete');
+  });
+});
+
+test('US14 · seul le restaurant de la commande la fait avancer', async () => {
+  await en('kanoun', async () => {
+    await assert.rejects(avancer(C_1044, 'prete'), /ne concerne pas votre restaurant/);
+  });
+  await en('leila', async () => {
+    await assert.rejects(avancer(C_1044, 'prete'), /ne concerne pas votre restaurant/);
+  });
+  await en(null, async () => {
+    await assert.rejects(avancer(C_1044, 'prete'), /permission denied/);
+  });
+  await en('zitouna', async () => {
+    await avancer(C_1044, 'prete');                      // la sienne : acceptée
+    assert.equal((await etatDe(C_1044)).etat, 'prete');
+  });
+});

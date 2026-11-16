@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router'
 import { beforeAll, describe, expect, it } from 'vitest'
 
 import { Routage } from '../App'
+import { ErreurMida } from '../auth/erreurs'
 import type { Compte } from '../auth/service'
 import { FournisseurSession } from '../auth/session'
 import { FauxService } from '../test/faux-service'
@@ -168,5 +169,79 @@ describe('plats du menu (US10)', () => {
     ouvrir(new FauxService(valide), '/menu/plats/inconnu')
     expect(await screen.findByRole('alert')).toHaveTextContent("Ce plat n'existe plus")
     expect(screen.getByRole('link', { name: 'Retour au menu' })).toHaveAttribute('href', '/menu')
+  })
+})
+
+describe('plat momentanément indisponible (US11)', () => {
+  const caseDispo = (nom: string) => screen.findByRole('checkbox', { name: `${nom} disponible à la commande` })
+
+  it('décoche « Disponible » en un clic : plat grisé, compté dans le résumé, message', async () => {
+    const u = userEvent.setup()
+    const service = new FauxService(valide)
+    ouvrir(service)
+
+    const caseThe = await caseDispo('Thé à la menthe')
+    expect(caseThe).toBeChecked()
+    expect(screen.getByText('3 catégories · 4 plats')).toBeInTheDocument()
+
+    await u.click(caseThe)
+
+    expect(
+      await screen.findByText('« Thé à la menthe » est indisponible : les clients le voient, mais ne peuvent plus le commander.'),
+    ).toBeInTheDocument()
+    expect(service.changerDisponibilite).toHaveBeenCalledWith('p4', false)
+    expect(caseThe).not.toBeChecked()
+    const plat = screen.getByRole('article', { name: 'Thé à la menthe' })
+    expect(plat).toHaveClass('plat-indisponible')
+    expect(within(plat).getByText('Indisponible')).toBeInTheDocument()
+    expect(screen.getByText('3 catégories · 4 plats · 1 plat indisponible')).toBeInTheDocument()
+    // pas de confirmation : un seul clic suffit
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+  })
+
+  it('réactive un plat indisponible en un clic', async () => {
+    const u = userEvent.setup()
+    const service = new FauxService(valide)
+    service.plats = service.plats.map((p) => (p.id === 'p3' ? { ...p, disponible: false } : p))
+    ouvrir(service)
+
+    const casePoisson = await caseDispo('Couscous au poisson')
+    expect(casePoisson).not.toBeChecked()
+    expect(screen.getByRole('article', { name: 'Couscous au poisson' })).toHaveClass('plat-indisponible')
+
+    await u.click(casePoisson)
+
+    expect(await screen.findByText('« Couscous au poisson » est de nouveau disponible à la commande.')).toBeInTheDocument()
+    expect(service.changerDisponibilite).toHaveBeenCalledWith('p3', true)
+    expect(casePoisson).toBeChecked()
+    expect(screen.getByRole('article', { name: 'Couscous au poisson' })).not.toHaveClass('plat-indisponible')
+    expect(within(screen.getByRole('article', { name: 'Couscous au poisson' })).getByText('Disponible')).toBeInTheDocument()
+  })
+
+  it('refus de la base : message d’erreur et la case revient comme avant', async () => {
+    const u = userEvent.setup()
+    const service = new FauxService(valide)
+    service.erreurPlat = new ErreurMida("Ce compte n'a pas le droit de modifier ce menu.")
+    ouvrir(service)
+
+    const caseAgneau = await caseDispo('Couscous à l’agneau')
+    await u.click(caseAgneau)
+
+    expect(await screen.findByText("Ce compte n'a pas le droit de modifier ce menu.")).toBeInTheDocument()
+    expect(caseAgneau).toBeChecked()
+    expect(screen.getByRole('article', { name: 'Couscous à l’agneau' })).not.toHaveClass('plat-indisponible')
+  })
+
+  it('modifier un plat ne change pas sa disponibilité', async () => {
+    const u = userEvent.setup()
+    const service = new FauxService(valide)
+    service.plats = service.plats.map((p) => (p.id === 'p3' ? { ...p, disponible: false } : p))
+    ouvrir(service, '/menu/plats/p3')
+
+    await remplir(u, { prix: '23' })
+    await u.click(screen.getByRole('button', { name: /Enregistrer/ }))
+
+    expect(await caseDispo('Couscous au poisson')).not.toBeChecked()
+    expect(service.plats.find((p) => p.id === 'p3')).toMatchObject({ prix: 23, disponible: false })
   })
 })

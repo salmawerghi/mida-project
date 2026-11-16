@@ -361,6 +361,12 @@ export class ServiceRestaurantSupabase implements ServiceRestaurant {
     // La photo n'est plus utilisée : on la retire du stockage (sans bloquer si elle n'existe pas).
     if (plat.imageUrl) await this.client.storage.from('restaurants').remove([`${restaurantId}/plats/${plat.id}.webp`])
   }
+
+  async changerDisponibilite(platId: string, disponible: boolean): Promise<void> {
+    const { data, error } = await this.client.from('plats').update({ disponible }).eq('id', platId).select('id')
+    if (error) throw error
+    if (!data?.length) throw new ErreurMida(messageMenuRefuse)
+  }
 }
 
 const colonnesPlat = 'id, categorie_id, nom, description, prix, image_url, disponible'

@@ -115,6 +115,11 @@ export class FauxService implements ServiceRestaurant {
     this.plats = this.plats.filter((p) => p.id !== plat.id)
   })
 
+  changerDisponibilite = vi.fn(async (platId: string, disponible: boolean) => {
+    if (this.erreurPlat) throw this.erreurPlat
+    this.plats = this.plats.map((p) => (p.id === platId ? { ...p, disponible } : p))
+  })
+
   erreurOuverture: unknown = null
   changerOuverture = vi.fn(async (_id: string, ouvert: boolean) => {
     if (this.erreurOuverture) throw this.erreurOuverture

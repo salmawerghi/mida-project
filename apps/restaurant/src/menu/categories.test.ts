@@ -41,5 +41,7 @@ describe('catégories du menu', () => {
     expect(libellePlats(14)).toBe('14 plats')
     expect(resumeMenu(menu)).toBe('3 catégories · 4 plats')
     expect(resumeMenu([])).toBe('0 catégories · aucun plat')
+    expect(resumeMenu(menu, 1)).toBe('3 catégories · 4 plats · 1 plat indisponible')
+    expect(resumeMenu(menu, 2)).toBe('3 catégories · 4 plats · 2 plats indisponibles')
   })
 })

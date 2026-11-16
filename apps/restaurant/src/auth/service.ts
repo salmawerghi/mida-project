@@ -111,6 +111,8 @@ export interface ServiceRestaurant {
    */
   enregistrerPlat(restaurantId: string, platId: string | null, infos: InfosPlat, photo: File | null): Promise<ResultatPlat>
   supprimerPlat(restaurantId: string, plat: Plat): Promise<void>
+  /** Rend un plat momentanément indisponible, ou le réactive (US11). */
+  changerDisponibilite(platId: string, disponible: boolean): Promise<void>
 }
 
 export interface ResultatPlat {

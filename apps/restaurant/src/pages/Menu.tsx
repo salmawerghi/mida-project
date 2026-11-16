@@ -28,7 +28,7 @@ type Action =
 
 /**
  * Menu du restaurant (maquette « Restaurant · Menu ») : les catégories
- * (US09) et les plats rangés dans chacune (US10).
+ * (US09), les plats rangés dans chacune (US10) et leur disponibilité (US11).
  */
 export default function Menu({ compte }: { compte: Compte }) {
   const { service } = useSession()
@@ -149,6 +149,31 @@ export default function Menu({ compte }: { compte: Compte }) {
     )
   }
 
+  /** Coche ou décoche « Disponible » : un seul clic, sans confirmation (US11). */
+  async function basculerDisponibilite(plat: Plat) {
+    const disponible = !plat.disponible
+    setAction(null)
+    setErreur(null)
+    setConfirmation(null)
+    setAvertissement(null)
+    setEnCours(true)
+    // affiché tout de suite ; remis comme avant si la base refuse
+    setPlats((liste) => liste.map((x) => (x.id === plat.id ? { ...x, disponible } : x)))
+    try {
+      await service.changerDisponibilite(plat.id, disponible)
+      setConfirmation(
+        disponible
+          ? `« ${plat.nom} » est de nouveau disponible à la commande.`
+          : `« ${plat.nom} » est indisponible : les clients le voient, mais ne peuvent plus le commander.`,
+      )
+    } catch (e) {
+      setPlats((liste) => liste.map((x) => (x.id === plat.id ? { ...x, disponible: plat.disponible } : x)))
+      setErreur(messageErreur(e))
+    } finally {
+      setEnCours(false)
+    }
+  }
+
   function supprimerPlat(plat: Plat) {
     void executer(() => service.supprimerPlat(restaurant.id, plat), `« ${plat.nom} » est retiré du menu.`)
   }
@@ -193,7 +218,7 @@ export default function Menu({ compte }: { compte: Compte }) {
       <div className="barre">
         <div>
           <h1>Votre menu</h1>
-          <p className="texte-doux">{resumeMenu(categories)}</p>
+          <p className="texte-doux">{resumeMenu(categories, plats.filter((p) => !p.disponible).length)}</p>
         </div>
         <div className="actions">
           <Bouton
@@ -323,13 +348,23 @@ export default function Menu({ compte }: { compte: Compte }) {
               <ul className="menu-liste">
                 {platsCategorie.map((p) => (
                   <li key={p.id} className="menu-ligne">
-                    <article className="plat" aria-label={p.nom}>
+                    <article className={p.disponible ? 'plat' : 'plat plat-indisponible'} aria-label={p.nom}>
                       <div className="plat-vignette">{p.imageUrl && <img src={p.imageUrl} alt="" />}</div>
                       <div className="plat-texte">
                         <div className="plat-nom">{p.nom}</div>
                         {p.description && <div className="plat-description">{p.description}</div>}
                       </div>
                       <div className="plat-prix">{formaterPrix(p.prix)}</div>
+                      <label className={p.disponible ? 'plat-dispo' : 'plat-dispo plat-dispo-non'}>
+                        <input
+                          type="checkbox"
+                          checked={p.disponible}
+                          disabled={enCours}
+                          aria-label={`${p.nom} disponible à la commande`}
+                          onChange={() => void basculerDisponibilite(p)}
+                        />
+                        <span aria-hidden="true">{p.disponible ? 'Disponible' : 'Indisponible'}</span>
+                      </label>
                       <span className="menu-boutons">
                         <Link
                           to={`/menu/plats/${p.id}`}

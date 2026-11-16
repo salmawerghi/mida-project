@@ -857,6 +857,36 @@ textarea.saisie {
   color: var(--bleu-fonce);
   white-space: nowrap;
 }
+/* Disponibilité (US11) : case à cocher de la maquette « Restaurant · Menu » */
+.plat-dispo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  width: 140px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--succes);
+  cursor: pointer;
+}
+.plat-dispo input {
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  accent-color: var(--succes);
+  cursor: pointer;
+}
+.plat-dispo input:disabled {
+  cursor: progress;
+}
+.plat-dispo-non {
+  color: var(--erreur);
+}
+.plat-indisponible .plat-vignette,
+.plat-indisponible .plat-texte,
+.plat-indisponible .plat-prix {
+  opacity: 0.5;
+}
 .plat-entete {
   display: flex;
   align-items: center;

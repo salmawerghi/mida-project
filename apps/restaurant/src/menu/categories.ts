@@ -48,9 +48,11 @@ export function libellePlats(n: number): string {
   return n === 1 ? '1 plat' : `${n} plats`
 }
 
-/** « 4 catégories · 14 plats » (sous-titre de la page). */
-export function resumeMenu(categories: CategorieMenu[]): string {
+/** « 4 catégories · 14 plats · 1 plat indisponible » (sous-titre de la page). */
+export function resumeMenu(categories: CategorieMenu[], nbIndisponibles = 0): string {
   const n = categories.length
   const plats = categories.reduce((somme, c) => somme + c.nbPlats, 0)
-  return `${n === 1 ? '1 catégorie' : `${n} catégories`} · ${libellePlats(plats)}`
+  const resume = `${n === 1 ? '1 catégorie' : `${n} catégories`} · ${libellePlats(plats)}`
+  if (nbIndisponibles === 0) return resume
+  return `${resume} · ${nbIndisponibles === 1 ? '1 plat indisponible' : `${nbIndisponibles} plats indisponibles`}`
 }

@@ -29,12 +29,13 @@ apps/
 | US04 | Appli client : inscription (nom, e-mail, téléphone +216, mot de passe), connexion, session conservée, déconnexion ; comptes non clients ou bloqués refusés | fait : 24 tests OK, essayé sur émulateur avec le vrai projet Supabase, puis installé sur un vrai téléphone (APK release) |
 | US05 | Espace restaurant web : inscription en 2 étapes (responsable puis restaurant), compte et restaurant « en attente » de validation, connexion, écran d'attente ou de refus (avec motif), pages réservées aux responsables connectés | fait : 27 tests Vitest + test PGlite, essayé avec le vrai projet Supabase |
 | US06 | Mot de passe oublié (appli client) : e-mail → code reçu par e-mail → nouveau mot de passe, puis session ouverte | codé, 13 tests OK ; **lien masqué** dans l'appli et essai réel en attente du réglage e-mail de Supabase (voir plus bas) |
-| US07 | Profil du restaurant (espace web) : nom, catégorie, adresse, ville, téléphone, description, logo et horaires des 7 jours ; ouvert dès l'inscription, même avant la validation | codé : 21 tests Vitest + 5 tests PGlite ; essai réel à faire |
-| US08 | Ouvrir ou fermer son restaurant en un clic (interrupteur du menu de l'espace web) ; un restaurant fermé ou non validé ne reçoit plus de nouvelle commande | codé : 4 tests Vitest + 4 tests PGlite, migration appliquée sur Supabase ; essai réel à faire (il faut un restaurant validé) ; affichage côté client avec le catalogue |
-| US09 | Catégories du menu (espace web, page « Menu ») : créer, renommer, ordonner ; suppression avec confirmation, qui annonce et supprime les plats de la catégorie | codé : 16 tests Vitest + 4 tests PGlite, fonction appliquée sur Supabase ; essai réel à faire |
-| US10 | Plats (espace web) : ajouter, modifier, supprimer un plat avec nom, description, prix positif, photo et catégorie ; aperçu côté client dans le formulaire | codé : 15 tests Vitest + 5 tests PGlite ; essai réel à faire ; affichage dans l'appli client avec le catalogue |
+| US07 | Profil du restaurant (espace web) : nom, catégorie, adresse, ville, téléphone, description, logo et horaires des 7 jours ; ouvert dès l'inscription, même avant la validation | fait : 21 tests Vitest + 5 tests PGlite ; essayé avec le vrai projet Supabase (infos, horaires, logo) |
+| US08 | Ouvrir ou fermer son restaurant en un clic (interrupteur du menu de l'espace web) ; un restaurant fermé ou non validé ne reçoit plus de nouvelle commande | fait : 4 tests Vitest + 4 tests PGlite, migration appliquée sur Supabase, essayé avec un vrai restaurant validé ; affichage côté client avec le catalogue |
+| US09 | Catégories du menu (espace web, page « Menu ») : créer, renommer, ordonner ; suppression avec confirmation, qui annonce et supprime les plats de la catégorie | fait : 16 tests Vitest + 4 tests PGlite, fonction appliquée sur Supabase, essayé avec le vrai projet |
+| US10 | Plats (espace web) : ajouter, modifier, supprimer un plat avec nom, description, prix positif, photo et catégorie ; aperçu côté client dans le formulaire | fait : 15 tests Vitest + 5 tests PGlite, essayé avec le vrai projet (plats avec photo) ; affichage dans l'appli client avec le catalogue |
+| US11 | Plat momentanément indisponible (espace web) : case « Disponible » sur chaque plat du menu, un clic pour le retirer de la commande ou le réactiver ; un plat indisponible ne peut pas être commandé | codé : 4 tests Vitest + 2 tests PGlite, migration appliquée sur Supabase ; essai réel à faire ; affichage grisé dans l'appli client avec le catalogue |
 
-US01 à US03, US08 et US09 sont appliquées sur le projet Supabase de Mida (`tpfpuwlgnxhwhezicuto`) ; le jeu de test n'y est pas encore chargé.
+US01 à US03, US08, US09 et US11 sont appliquées sur le projet Supabase de Mida (`tpfpuwlgnxhwhezicuto`) ; le jeu de test n'y est pas encore chargé.
 
 ## Appliquer sur un projet Supabase
 
@@ -168,7 +169,13 @@ Page `/profil` (`src/pages/Profil.tsx`), dans le cadre à menu latéral (`src/Ca
 - **Photo** (facultative) : JPEG, PNG ou WebP, 5 Mo au plus, réduite à 800 px et convertie en WebP, envoyée à `restaurants/<restaurant_id>/plats/<plat_id>.webp`. L'identifiant du plat est choisi par l'appli (`crypto.randomUUID()`) pour nommer la photo. Le plat est enregistré d'abord : si la photo échoue, il reste au menu sans photo et un avertissement invite à réessayer. Supprimer un plat retire aussi sa photo du stockage (pas encore pour les plats supprimés avec leur catégorie).
 - **Catégorie** : obligatoire, et forcément une catégorie du même restaurant (clé étrangère composée de la migration US01).
 - **Côté client** : les plats d'un restaurant validé sont lisibles par les visiteurs et les clients (vérifié par les tests « US10 » de `supabase/tests`) ; l'appli client les affichera avec l'écran du restaurant (pas encore développé).
-- La case « disponible » (plat épuisé) est la story US11.
+- La case « disponible » (plat épuisé) : voir US11 ci-dessous. Modifier un plat ne change pas sa disponibilité.
+
+### Plat indisponible (US11)
+
+- Sur la page `/menu`, chaque plat a une case **« Disponible »**, comme dans la maquette « Restaurant · Menu ». Un clic la décoche : le plat est grisé, marqué « Indisponible », et le sous-titre compte les plats indisponibles (« 3 catégories · 8 plats · 1 plat indisponible »). Un second clic le réactive. Pas de confirmation, car l'action se défait aussi vite. Si la base refuse, la case revient comme avant et un message s'affiche.
+- **Côté client** : le plat reste visible (les clients savent qu'il existe), mais il ne peut pas être commandé. La base le garantit, quelle que soit l'appli : le déclencheur `plat_disponible` sur `lignes_commande` (migration `20261116000001`, fonction `private.verifier_plat_disponible`) refuse une ligne d'une commande `en_attente` dont le plat est indisponible (« Le plat « … » est indisponible pour le moment »). La future fonction « passer commande » et le panier de l'appli client devront afficher ce refus ; le panier devra aussi griser le bouton « Ajouter ».
+- Les commandes déjà passées ne sont pas concernées si le plat devient indisponible ensuite.
 
 ## Mot de passe oublié (US06) — en attente du réglage e-mail
 

@@ -763,3 +763,50 @@ test('US10 · la photo d\'un plat va dans le dossier de son restaurant', async (
     await assert.rejects(envoyer('restaurants', `${R_KANOUN}/plats/41000000-0000-4000-8000-000000000001.webp`), RLS);
   });
 });
+
+// =====================================================================
+// US11 — plat momentanément indisponible
+// =====================================================================
+const P_COUS_POISSON = '40000000-0000-4000-8000-000000000003';   // Dar Zitouna, indisponible dans le seed
+const P_THE = '40000000-0000-4000-8000-000000000007';            // Dar Zitouna, disponible
+const P_OJJA_MERGUEZ = '40000000-0000-4000-8000-000000000008';   // El Kanoun
+const C_1040 = '60000000-0000-4000-8000-000000001040';           // livrée
+const C_1045 = '60000000-0000-4000-8000-000000001045';           // en attente
+const NOUVELLE_LIGNE = (commande, plat, nom) => [
+  `insert into public.lignes_commande (commande_id, plat_id, nom_plat, quantite, prix_unitaire)
+   values ($1, $2, $3, 1, 10)`, [commande, plat, nom]];
+
+test('US11 · un responsable rend un plat indisponible puis le réactive, les clients le voient', async () => {
+  await en('zitouna', async () => {
+    assert.equal(await nbModifiees(`update public.plats set disponible = false where id = $1`, [P_THE]), 1);
+    assert.equal(await nbModifiees(`update public.plats set disponible = true where id = $1`, [P_COUS_POISSON]), 1);
+    // pas les plats d'un autre restaurant
+    assert.equal(await nbModifiees(`update public.plats set disponible = false where id = $1`, [P_OJJA_MERGUEZ]), 0);
+  });
+  // le plat indisponible reste dans le menu côté client, marqué comme tel
+  for (const lecteur of [null, 'amine']) {
+    await en(lecteur, async () => {
+      assert.deepEqual(await lignes(`select nom, disponible from public.plats where id = $1`, [P_THE]),
+                       [{ nom: 'Thé à la menthe', disponible: false }]);
+    }, `update public.plats set disponible = false where id = '${P_THE}'`);
+  }
+});
+
+test('US11 · un plat indisponible ne peut pas être commandé', async () => {
+  await debut();
+  try {
+    await db.exec('set local role service_role');           // comme la future fonction « passer commande »
+    await requete(...NOUVELLE_LIGNE(C_1045, P_THE, 'Thé à la menthe'));   // disponible : acceptée
+    await assert.rejects(requete(...NOUVELLE_LIGNE(C_1045, P_COUS_POISSON, 'Couscous au poisson')),
+                         /« Couscous au poisson » est indisponible/);
+    // réactivé en un clic : il peut de nouveau être commandé
+    await requete(`update public.plats set disponible = true where id = $1`, [P_COUS_POISSON]);
+    await requete(...NOUVELLE_LIGNE(C_1045, P_COUS_POISSON, 'Couscous au poisson'));
+    // l'historique n'est pas concerné : un plat devenu indisponible reste dans les anciennes commandes
+    await requete(`update public.plats set disponible = false where id = $1`, [P_THE]);
+    await requete(...NOUVELLE_LIGNE(C_1040, P_THE, 'Thé à la menthe'));
+    assert.equal((await lignes(`select count(*)::int as n from public.lignes_commande where plat_id = $1`, [P_THE]))[0].n, 3);
+  } finally {
+    await fin();
+  }
+});

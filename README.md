@@ -40,6 +40,7 @@ apps/
 | US15 | Catalogue de l'appli client : restaurants validés (ouverts d'abord), avec logo, catégorie, ville, note moyenne et nombre d'avis, état ouvert / fermé, délai ; aussi pour les visiteurs | codé : 6 tests Flutter + 1 test PGlite, vue appliquée sur Supabase ; essai réel à faire |
 | US16 | Recherche d'un restaurant par nom (sans tenir compte des majuscules ni des accents) et filtre par catégorie ; message et « Effacer les filtres » s'il n'y a aucun résultat | codé : 5 tests Flutter ; essai réel à faire |
 | US17 | Menu d'un restaurant (appli client) : rubriques dans l'ordre du restaurant, plats avec photo, description et prix, plats indisponibles signalés, note, délai et horaire du jour ; restaurant fermé consultable avec un bandeau | codé : 7 tests Flutter ; essai réel à faire |
+| US18 | Panier (appli client) : ajouter des plats depuis le menu, modifier les quantités (1 à 20), retirer, vider ; total à jour ; un seul restaurant par panier (proposition de vider sinon) ; conservé en quittant l'écran | codé : 7 tests Flutter ; essai réel à faire |
 
 US01 à US03, US08, US09 et US11 à US15 sont appliquées sur le projet Supabase de Mida (`tpfpuwlgnxhwhezicuto`) ; le jeu de test n'y est pas encore chargé.
 
@@ -135,6 +136,13 @@ flutter run         # se connecte au projet Supabase de Mida (lib/config.dart)
 - Toucher un restaurant du catalogue ouvre `RestaurantPage` (maquette « Client · Restaurant ») : en-tête bleu avec le logo, puis note (« ★ 4,8 », « 12 avis »), délai, et ouverture du jour (« Ouvert, jusqu'à 23:00 », d'après la table `horaires`, 1 = lundi comme `DateTime.weekday`).
 - Le menu est classé par rubriques (`categories_menu`, dans l'ordre choisi par le restaurant ; les rubriques vides sont masquées). Des puces en haut font défiler jusqu'à une rubrique. Chaque plat montre sa photo (ou une illustration Mida), sa description et son prix ; un plat **indisponible** (US11) est grisé avec l'étiquette « Indisponible ».
 - Un restaurant **fermé** reste consultable, avec un bandeau « Ce restaurant est fermé pour le moment : vous pouvez consulter son menu, mais pas commander. »
+
+### Panier (US18)
+
+- `Panier` (`lib/panier/panier.dart`, un `ChangeNotifier`) est créé une seule fois dans `main.dart` et fourni par `Dependances` : il est **conservé** quand on change d'écran, et aussi pendant qu'un visiteur se connecte. Il n'est pas enregistré sur le téléphone : il se vide si l'appli est fermée.
+- Dans le menu, un plat disponible d'un restaurant ouvert a un bouton « + » ; une fois au panier, il devient « − 2 + » (la corbeille remplace « − » au dernier exemplaire). Quantité maximale : 20 par plat. La barre du bas « Voir le panier » affiche le nombre d'articles et le sous-total ; l'icône du panier, en haut de l'accueil, affiche le nombre d'articles.
+- **Un seul restaurant par panier** : ajouter un plat d'un autre restaurant ouvre « Commencer un nouveau panier ? » (« Garder mon panier » / « Vider et ajouter »).
+- Page panier : chaque ligne avec son montant et « − / + », sous-total mis à jour à chaque modification, bouton « Vider » (avec confirmation), et un écran « Votre panier est vide ».
 
 - Les services sont fournis à tous les écrans par `Dependances.of(context)` (`lib/dependances.dart`) ; les tests utilisent `test/faux_service_mida.dart`.
 

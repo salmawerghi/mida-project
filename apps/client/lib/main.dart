@@ -7,6 +7,7 @@ import 'dependances.dart';
 import 'donnees/service_mida.dart';
 import 'pages/accueil_page.dart';
 import 'pages/bienvenue_page.dart';
+import 'panier/panier.dart';
 import 'theme.dart';
 
 Future<void> main() async {
@@ -15,23 +16,14 @@ Future<void> main() async {
   // elle est restaurée (et rafraîchie) au prochain lancement.
   await Supabase.initialize(url: supabaseUrl, publishableKey: supabaseKey);
   final client = Supabase.instance.client;
-  runApp(
-    AppMida(
-      auth: ServiceAuthSupabase(client),
-      mida: ServiceMidaSupabase(client),
-    ),
-  );
+  runApp(AppMida(auth: ServiceAuthSupabase(client), mida: ServiceMidaSupabase(client), panier: Panier()));
 }
 
 class AppMida extends StatelessWidget {
-  const AppMida({
-    super.key,
-    required this.auth,
-    required this.mida,
-    this.theme,
-  });
+  const AppMida({super.key, required this.auth, required this.mida, required this.panier, this.theme});
   final ServiceAuth auth;
   final ServiceMida mida;
+  final Panier panier;
   final ThemeData? theme;
 
   @override
@@ -41,6 +33,7 @@ class AppMida extends StatelessWidget {
     return Dependances(
       auth: auth,
       mida: mida,
+      panier: panier,
       child: MaterialApp(
         title: 'Mida',
         debugShowCheckedModeBanner: false,
@@ -50,9 +43,7 @@ class AppMida extends StatelessWidget {
           builder: (context, _) {
             // Écran racine : accueil si une session est ouverte, sinon bienvenue.
             final connecte = auth.session != null;
-            return connecte
-                ? AccueilPage(auth: auth)
-                : BienvenuePage(auth: auth);
+            return connecte ? AccueilPage(auth: auth) : BienvenuePage(auth: auth);
           },
         ),
       ),

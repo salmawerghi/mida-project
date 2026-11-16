@@ -7,8 +7,10 @@ import '../donnees/modeles.dart';
 import '../theme.dart';
 import '../widgets/catalogue.dart';
 import '../widgets/composants.dart';
+import '../widgets/panier_widgets.dart';
 
-/// Menu d'un restaurant, classé par rubriques (maquette « Client · Restaurant », US17).
+/// Menu d'un restaurant, classé par rubriques (maquette « Client · Restaurant », US17) ;
+/// les plats disponibles s'ajoutent au panier (US18).
 class RestaurantPage extends StatefulWidget {
   const RestaurantPage({super.key, required this.restaurant});
   final RestaurantCatalogue restaurant;
@@ -56,6 +58,7 @@ class _RestaurantPageState extends State<RestaurantPage> {
     final menu = _menu;
     final rubriques = menu?.rubriques ?? const [];
     return Scaffold(
+      bottomNavigationBar: BarrePanier(restaurantId: r.id),
       body: RefreshIndicator(
         onRefresh: _charger,
         child: CustomScrollView(
@@ -136,7 +139,10 @@ class _RestaurantPageState extends State<RestaurantPage> {
                         child: Semantics(header: true, child: Text(c.nom, style: textes.headlineSmall?.copyWith(fontSize: 22))),
                       ),
                       for (final p in plats) ...[
-                        CartePlat(plat: p),
+                        CartePlat(
+                          plat: p,
+                          action: p.disponible && r.ouvert ? AjoutPlat(restaurant: r, plat: p) : null,
+                        ),
                         const SizedBox(height: 12),
                       ],
                     ],

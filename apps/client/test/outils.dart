@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mida_client/dependances.dart';
+import 'package:mida_client/panier/panier.dart';
 import 'package:mida_client/theme.dart';
 
 import 'faux_service_auth.dart';
@@ -12,6 +13,7 @@ Future<void> ouvrirPage(
   Widget page, {
   FauxServiceMida? mida,
   FauxServiceAuth? auth,
+  Panier? panier,
 }) async {
   tester.view.physicalSize = const Size(1080, 2400);
   tester.view.devicePixelRatio = 3;
@@ -19,6 +21,7 @@ Future<void> ouvrirPage(
   await tester.pumpWidget(Dependances(
     auth: auth ?? FauxServiceAuth(),
     mida: mida ?? FauxServiceMida(),
+    panier: panier ?? Panier(),
     child: MaterialApp(theme: construireTheme(policesGoogle: false), home: page),
   ));
   await tester.pumpAndSettle();

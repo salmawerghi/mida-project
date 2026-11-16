@@ -7,6 +7,7 @@ import '../donnees/modeles.dart';
 import '../theme.dart';
 import '../widgets/catalogue.dart';
 import '../widgets/composants.dart';
+import '../widgets/panier_widgets.dart';
 import 'connexion_page.dart';
 import 'inscription_page.dart';
 import 'restaurant_page.dart';
@@ -93,6 +94,7 @@ class _AccueilPageState extends State<AccueilPage> {
           ],
         ),
         actions: [
+          const IconePanier(),
           if (!widget.visiteur)
             IconButton(
               tooltip: 'Se déconnecter',

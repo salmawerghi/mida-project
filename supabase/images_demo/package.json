@@ -1,0 +1,8 @@
+{
+  "name": "mida-images-demo",
+  "private": true,
+  "type": "module",
+  "description": "Envoie les logos et photos des restaurants de démonstration (illustrations Mida) dans le stockage Supabase",
+  "scripts": { "envoyer": "node envoyer_images.mjs" },
+  "dependencies": { "sharp": "0.34.4" }
+}

@@ -99,6 +99,23 @@ Avec la CLI Supabase : `supabase link --project-ref <ref>` puis `supabase db pus
 
 Comptes de démonstration uniquement : ne jamais exécuter `seed.sql` en production.
 
+### Restaurants de démonstration (en ligne depuis le 18/11)
+
+Pour remplir le catalogue sans le reste du seed (ni clients, ni commandes, ni changement des paramètres), `supabase/restaurants_demo.sql` a été exécuté sur le projet Supabase : **8 restaurants validés** avec leur responsable (mot de passe `Mida2026!`), leurs horaires et leur menu (37 plats), rangés dans les catégories « Salé » / « Sucré » créées dans l'admin. Les 4 restaurants des maquettes reprennent les identifiants de `seed.sql` (pas de doublon s'il est lancé plus tard ; le seed laisserait alors Lella Béya validée).
+
+| Restaurant | Ville | Catégorie | Compte responsable |
+|---|---|---|---|
+| Dar Zitouna | La Marsa | Salé | zitouna@mida.test |
+| El Kanoun (fermé le lundi) | Gammarth | Salé | kanoun@mida.test |
+| Brik Bab Souika (**fermé** en ce moment) | Tunis | Salé | babsouika@mida.test |
+| Lella Béya | Sidi Bou Saïd | Salé | lellabeya@mida.test |
+| Pâtisserie Ennakhla | Ariana | Sucré | ennakhla@mida.test |
+| Chapati Ennasr | Ennasr | Salé | chapati@mida.test |
+| Koffa du Bardo | Le Bardo | Salé | koffa@mida.test |
+| Café Sidi Mahrez | Tunis | Sucré | sidimahrez@mida.test |
+
+Logos et photos des plats : illustrations Mida générées en WebP et envoyées dans le bucket `restaurants` par `supabase/images_demo` (`npm install && npm run envoyer` ; `node envoyer_images.mjs --apercu <dossier>` pour les voir sans rien envoyer). Le script se connecte avec le compte de chaque responsable : les règles d'accès du stockage s'appliquent comme dans l'appli web.
+
 ## Règles de sécurité (résumé)
 
 - **Visiteur** (sans compte) : restaurants validés, leurs menus, horaires et avis.

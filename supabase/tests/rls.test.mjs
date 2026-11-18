@@ -1290,3 +1290,134 @@ test('US28 · remise d\'une commande en espèces : le paiement est encaissé ; s
     await accepterCourse(L_1044);
   });
 });
+
+// =====================================================================
+// US32 à US37 — administration
+// =====================================================================
+const R_BEYA = '10000000-0000-4000-8000-000000000004';            // restaurant en attente
+const deciderRestaurant = (id, valider, motif = null) =>
+  requete(`select public.admin_decider_restaurant($1, $2, $3)`, [id, valider, motif]);
+const deciderLivreur = (id, valider, motif = null) =>
+  requete(`select public.admin_decider_livreur($1, $2, $3)`, [id, valider, motif]);
+const bloquer = (id, oui) => requete(`select public.admin_bloquer_compte($1, $2)`, [id, oui]);
+
+test('US32 · les actions d\'administration sont refusées aux autres comptes', async () => {
+  for (const qui of ['amine', 'zitouna', 'sami']) {
+    await en(qui, async () => {
+      await assert.rejects(deciderRestaurant(R_BEYA, true), /réservée aux administrateurs/);
+      await assert.rejects(deciderLivreur(ids.yassine, true), /réservée aux administrateurs/);
+      await assert.rejects(bloquer(ids.amine, true), /réservée aux administrateurs/);
+    });
+  }
+  await en(null, async () => {
+    await assert.rejects(deciderRestaurant(R_BEYA, true), /permission denied/);
+  });
+});
+
+test('US33 · l\'admin valide un restaurant : visible des clients, responsable prévenu', async () => {
+  await en('admin', async () => {
+    await deciderRestaurant(R_BEYA, true);
+    await assert.rejects(deciderRestaurant(R_BEYA, true), /déjà été traitée/);
+    await devenir('amine');
+    assert.ok((await lignes(`select nom from public.restaurants`)).some((r) => r.nom === 'Lella Béya'));
+    await db.exec('reset role');
+    const [p] = await lignes(`select etat_compte::text from public.profiles where id = $1`, [ids.lellabeya]);
+    assert.equal(p.etat_compte, 'actif');
+    const notifs = await lignes(`select titre from public.notifications where destinataire_id = $1`, [ids.lellabeya]);
+    assert.deepEqual(notifs, [{ titre: 'Restaurant validé' }]);
+  });
+});
+
+test('US33 · rejet d\'un restaurant : motif obligatoire, invisible des clients', async () => {
+  await en('admin', async () => {
+    await assert.rejects(deciderRestaurant(R_BEYA, false, '  '), /motif du rejet/);
+    await deciderRestaurant(R_BEYA, false, 'Adresse hors zone desservie');
+    const [r] = await lignes(`select etat::text, motif_rejet from public.restaurants where id = $1`, [R_BEYA]);
+    assert.deepEqual(r, { etat: 'rejete', motif_rejet: 'Adresse hors zone desservie' });
+    await devenir('amine');
+    assert.ok(!(await lignes(`select nom from public.restaurants`)).some((x) => x.nom === 'Lella Béya'));
+  });
+});
+
+test('US34 · l\'admin consulte les documents puis valide un livreur, qui peut se mettre disponible', async () => {
+  await en('admin', async () => {
+    const docs = await lignes(`select type from public.documents_livreur where livreur_id = $1 order by type`, [ids.yassine]);
+    assert.deepEqual(docs.map((d) => d.type), ['carte_grise', 'cin', 'permis']);
+    await deciderLivreur(ids.yassine, true);
+    assert.deepEqual(await lignes(`select distinct etat::text from public.documents_livreur where livreur_id = $1`, [ids.yassine]),
+      [{ etat: 'valide' }]);
+    await devenir('yassine');
+    await disponible(true);
+    assert.deepEqual(await numeros(), [1044]);
+    await db.exec('reset role');
+    assert.deepEqual(await lignes(`select titre from public.notifications where destinataire_id = $1`, [ids.yassine]),
+      [{ titre: 'Compte livreur activé' }]);
+  });
+});
+
+test('US34 · rejet d\'un livreur : motif obligatoire, documents refusés', async () => {
+  await en('admin', async () => {
+    await assert.rejects(deciderLivreur(ids.yassine, false), /motif du rejet/);
+    await deciderLivreur(ids.yassine, false, 'Photo de la carte grise illisible');
+    const [p] = await lignes(`select etat_compte::text from public.profiles where id = $1`, [ids.yassine]);
+    assert.equal(p.etat_compte, 'rejete');
+    await assert.rejects(deciderLivreur(ids.sami, true), /déjà été traitée/);
+    await assert.rejects(deciderLivreur(ids.amine, true), /Livreur introuvable/);
+  });
+});
+
+test('US35 · bloquer puis réactiver : client, livreur et responsable (avec son restaurant)', async () => {
+  await en('admin', async () => {
+    await bloquer(ids.amine, true);
+    await assert.rejects(bloquer(ids.amine, true), /déjà bloqué/);
+    await bloquer(ids.sami, true);
+    await bloquer(ids.zitouna, true);
+    await assert.rejects(bloquer(ids.admin, true), /administrateur/);
+    const etats = async () => lignes(`select
+        (select etat_compte::text from public.profiles where id = $1) as client,
+        (select disponible from public.livreurs where id = $2) as livreur_dispo,
+        (select etat::text from public.restaurants where responsable_id = $3) as restaurant,
+        (select ouvert from public.restaurants where responsable_id = $3) as ouvert`, [ids.amine, ids.sami, ids.zitouna]);
+    assert.deepEqual(await etats(), [{ client: 'bloque', livreur_dispo: false, restaurant: 'bloque', ouvert: false }]);
+    // un client bloqué ne peut plus commander
+    await devenir('amine');
+    await assert.rejects(requete(`select public.passer_commande($1, $2::jsonb, 'x')`,
+      ['10000000-0000-4000-8000-000000000002', JSON.stringify([{ plat_id: '40000000-0000-4000-8000-000000000008', quantite: 1 }])]), /bloqu|suspendu/i);
+    await devenir('admin');
+    await bloquer(ids.amine, false);
+    await bloquer(ids.zitouna, false);
+    assert.deepEqual((await etats())[0].client, 'actif');
+    assert.deepEqual((await etats())[0].restaurant, 'actif');
+    await assert.rejects(bloquer(ids.leila, false), /n'est pas bloqué/);
+  });
+});
+
+test('US36 · l\'admin lit toutes les commandes avec leur paiement', async () => {
+  await en('admin', async () => {
+    assert.deepEqual(await numeros(), [1040, 1042, 1043, 1044, 1045, 1046]);
+    const [p] = await lignes(`select p.mode::text, p.etat::text, p.reference_passerelle from public.paiements p
+                              join public.commandes c on c.id = p.commande_id where c.numero = 1043`);
+    assert.deepEqual(p, { mode: 'carte', etat: 'rembourse', reference_passerelle: 'pi_test_1043' });
+  });
+});
+
+test('US37 · l\'admin règle les frais (pour les commandes suivantes) et les catégories', async () => {
+  await en('admin', async () => {
+    assert.equal(await nbModifiees(`update public.parametres set frais_livraison = 3.000, commission_pct = 12, gain_livreur = 2.500`), 1);
+    await assert.rejects(lignes(`update public.parametres set frais_livraison = 500`), /check/i);
+    await requete(`insert into public.categories_restaurant (nom, ordre) values ('Pizzas', 9)`);
+    await assert.rejects(requete(`insert into public.categories_restaurant (nom) values ('  ')`), /check/i);
+    // la commande suivante prend les nouveaux frais ; les anciennes gardent les leurs
+    await devenir('amine');
+    await requete(`select public.passer_commande($1, $2::jsonb, '12, rue du Jasmin')`,
+      ['10000000-0000-4000-8000-000000000002', JSON.stringify([{ plat_id: '40000000-0000-4000-8000-000000000008', quantite: 1 }])]);
+    const fr = await lignes(`select numero, frais_livraison::text from public.commandes where client_id = auth.uid() order by numero desc limit 2`);
+    assert.equal(fr[0].frais_livraison, '3.000');
+    assert.equal(fr[1].frais_livraison, '2.500');
+    assert.ok((await lignes(`select nom from public.categories_restaurant`)).some((c) => c.nom === 'Pizzas'));
+  });
+  await en('zitouna', async () => {
+    assert.equal(await nbModifiees(`update public.parametres set frais_livraison = 0`), 0);
+    await assert.rejects(requete(`insert into public.categories_restaurant (nom) values ('Burgers')`), RLS);
+  });
+});

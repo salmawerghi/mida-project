@@ -814,9 +814,9 @@ test('US11 · un plat indisponible ne peut pas être commandé', async () => {
 // =====================================================================
 // US12 — nouvelles commandes en temps réel
 // =====================================================================
-test('US12 · les commandes sont diffusées en temps réel', async () => {
-  const tables = await lignes(`select tablename from pg_publication_tables where pubname = 'supabase_realtime'`);
-  assert.deepEqual(tables, [{ tablename: 'commandes' }]);
+test('US12 · les commandes (et, depuis US27, les courses) sont diffusées en temps réel', async () => {
+  const tables = await lignes(`select tablename from pg_publication_tables where pubname = 'supabase_realtime' order by 1`);
+  assert.deepEqual(tables, [{ tablename: 'commandes' }, { tablename: 'livraisons' }]);
 });
 
 test('US12 · le restaurant lit le détail de ses commandes : plats, paiement, nom du client', async () => {
@@ -1141,4 +1141,152 @@ test('US21 · une commande payée par carte et annulée est remboursée', async 
     await annuler(C_TEST);
     assert.deepEqual(await lignes(`select etat::text from public.paiements where commande_id = $1`, [C_TEST]), [{ etat: 'rembourse' }]);
   }, COMMANDE_CARTE);
+});
+
+// =====================================================================
+// US25 à US28 — livreurs : inscription, disponibilité, courses
+// =====================================================================
+const courseDe = async (commande) =>
+  (await db.query(`select id from public.livraisons where commande_id = $1`, [commande])).rows[0]?.id;
+const L_1044 = await courseDe(C_1044);                           // proposée, sans livreur
+const L_1046 = await courseDe(C_1046);                           // récupérée par Karim
+/** Change d'utilisateur sans quitter la transaction de `en`. */
+async function devenir(utilisateur) {
+  await db.exec('reset role');
+  await db.query("select set_config('request.jwt.claim.sub', $1, true)", [ids[utilisateur]]);
+  await db.exec('set local role authenticated');
+}
+const accepterCourse = (id) => requete(`select public.accepter_course($1)`, [id]);
+const recupererCourse = (id) => requete(`select public.recuperer_course($1)`, [id]);
+const livrerCourse = (id) => requete(`select public.livrer_course($1)`, [id]);
+const disponible = (oui) => requete(`update public.livreurs set disponible = $1 where id = auth.uid()`, [oui]);
+
+test('US25 · un livreur s\'inscrit, complète son véhicule et dépose ses documents : compte en attente', async () => {
+  const id = 'f0000000-0000-4000-8000-000000000025';
+  await en(null, async () => {
+    await db.exec('reset role');
+    await db.exec(`insert into auth.users (id, email, raw_user_meta_data) values
+      ('${id}', 'nouveau.livreur@mida.test', '{"role": "livreur", "nom": "Nouveau Livreur", "telephone": "+216 50 111 222"}')`);
+    await db.query("select set_config('request.jwt.claim.sub', $1, true)", [id]);
+    await db.exec('set local role authenticated');
+    assert.equal(await nbModifiees(`update public.livreurs set type_vehicule = 'moto', immatriculation = '210 TU 4521'
+                                    where id = auth.uid()`), 1);
+    await requete(`insert into storage.objects (bucket_id, name) values ('documents-livreurs', $1)`, [`${id}/cin.jpg`]);
+    // même s'il prétend le contraire, le document attend la validation
+    await requete(`insert into public.documents_livreur (livreur_id, type, fichier_url, etat)
+                   values (auth.uid(), 'cin', $1, 'valide')`, [`${id}/cin.jpg`]);
+    const [p] = await lignes(`select p.role::text, p.etat_compte::text, l.type_vehicule::text, d.etat::text as doc
+                              from public.profiles p join public.livreurs l on l.id = p.id
+                              join public.documents_livreur d on d.livreur_id = p.id where p.id = auth.uid()`);
+    assert.deepEqual(p, { role: 'livreur', etat_compte: 'en_attente', type_vehicule: 'moto', doc: 'en_attente' });
+    // pas encore validé : il ne peut ni se mettre disponible, ni voir de course
+    await assert.rejects(disponible(true), /doit être validé par Mida/);
+    assert.deepEqual(await numeros(), []);
+  });
+});
+
+test('US26 · un livreur indisponible ne reçoit aucune proposition ; l\'état est enregistré', async () => {
+  await en('sami', async () => {
+    assert.deepEqual(await numeros(), [1040, 1042, 1044]);
+    await disponible(false);
+    assert.deepEqual(await numeros(), [1040, 1042]);                // ses anciennes courses seulement
+    assert.deepEqual(await lignes(`select disponible from public.livreurs where id = auth.uid()`), [{ disponible: false }]);
+    await assert.rejects(accepterCourse(L_1044), /Mettez-vous disponible/);
+    await disponible(true);
+    assert.deepEqual(await numeros(), [1040, 1042, 1044]);
+  });
+});
+
+test('US26 · un livreur bloqué devient indisponible et ne peut plus se remettre disponible', async () => {
+  await en('admin', async () => {
+    await requete(`update public.profiles set etat_compte = 'bloque' where id = $1`, [ids.sami]);
+    await devenir('sami');
+    assert.deepEqual(await lignes(`select disponible from public.livreurs where id = auth.uid()`), [{ disponible: false }]);
+    await assert.rejects(disponible(true), /doit être validé par Mida/);
+  });
+});
+
+test('US27 · la course est proposée dès que le restaurant accepte la commande', async () => {
+  await en('zitouna', async () => {
+    await requete(`select public.accepter_commande($1)`, [C_1045]);
+    await db.exec('reset role');
+    assert.deepEqual(await lignes(`select etat::text, livreur_id, gain_livreur::text from public.livraisons where commande_id = $1`, [C_1045]),
+      [{ etat: 'proposee', livreur_id: null, gain_livreur: '2.000' }]);
+    await devenir('sami');
+    assert.deepEqual(await numeros(), [1040, 1042, 1044, 1045]);
+    // la course affiche le restaurant, l'adresse du client, le gain et le paiement
+    const [c] = await lignes(`select r.nom, c.adresse_livraison, l.gain_livreur::text, p.mode::text, p.montant::text
+      from public.livraisons l join public.commandes c on c.id = l.commande_id
+      join public.restaurants r on r.id = c.restaurant_id join public.paiements p on p.commande_id = c.id
+      where l.commande_id = $1`, [C_1045]);
+    assert.deepEqual(c, { nom: 'Dar Zitouna', adresse_livraison: '27, avenue de Paris, Tunis', gain_livreur: '2.000', mode: 'especes', montant: '25.500' });
+  });
+});
+
+test('US27 · une course n\'est attribuée qu\'à un seul livreur, et disparaît chez les autres', async () => {
+  const yassineDisponible = `update public.profiles set etat_compte = 'actif' where email = 'yassine@mida.test';
+                             update public.livreurs l set disponible = true from public.profiles p
+                             where p.id = l.id and p.email = 'yassine@mida.test';`;
+  await en('sami', async () => {
+    await accepterCourse(L_1044);
+    const [l] = await lignes(`select etat::text, livreur_id = auth.uid() as moi, acceptee_le is not null as datee
+                              from public.livraisons where id = $1`, [L_1044]);
+    assert.deepEqual(l, { etat: 'acceptee', moi: true, datee: true });
+    await assert.rejects(accepterCourse(L_1044), /Terminez d'abord votre course en cours/);
+    await devenir('yassine');
+    assert.deepEqual(await numeros(), []);                         // elle a disparu chez les autres
+    await assert.rejects(accepterCourse(L_1044), /déjà été acceptée par un autre livreur/);
+    await db.exec('reset role');
+    const notifs = await lignes(`select titre, message from public.notifications where commande_id = $1 and titre = 'Livreur en route'`, [C_1044]);
+    assert.deepEqual(notifs, [{ titre: 'Livreur en route', message: 'Sami Ben Salah livrera votre commande n° 1044.' }]);
+  }, yassineDisponible);
+  // un livreur déjà en course (Karim) ou un client ne peuvent pas l'accepter
+  await en('karim', async () => {
+    await assert.rejects(accepterCourse(L_1044), /Terminez d'abord/);
+  });
+  await en('amine', async () => {
+    await assert.rejects(accepterCourse(L_1044), /doit être validé par Mida/);
+  });
+  await en(null, async () => {
+    await assert.rejects(accepterCourse(L_1044), /permission denied/);
+  });
+});
+
+test('US28 · récupération seulement si la commande est prête, puis en livraison, puis livrée', async () => {
+  await en('sami', async () => {
+    await accepterCourse(L_1044);
+    await assert.rejects(livrerCourse(L_1044), /Confirmez d'abord la récupération/);
+    await assert.rejects(recupererCourse(L_1044), /n° 1044 n'est pas encore prête/);
+    await devenir('zitouna');
+    await requete(`select public.avancer_commande($1, 'prete')`, [C_1044]);
+    await devenir('sami');
+    await recupererCourse(L_1044);
+    assert.equal((await etatDe(C_1044)).etat, 'en_livraison');
+    await assert.rejects(recupererCourse(L_1044), /déjà été récupérée/);
+    await livrerCourse(L_1044);
+    const [c] = await lignes(`select c.etat::text, c.livree_le is not null as datee, l.etat::text as course, p.etat::text as paiement
+      from public.commandes c join public.livraisons l on l.commande_id = c.id join public.paiements p on p.commande_id = c.id
+      where c.id = $1`, [C_1044]);
+    assert.deepEqual(c, { etat: 'livree', datee: true, course: 'livree', paiement: 'paye' });   // carte : déjà payée
+    await db.exec('reset role');
+    const titres = (await lignes(`select titre from public.notifications where commande_id = $1 order by titre`, [C_1044])).map((n) => n.titre);
+    assert.ok(titres.includes('Commande en route') && titres.includes('Commande livrée'));
+  });
+});
+
+test('US28 · remise d\'une commande en espèces : le paiement est encaissé ; seul son livreur la confirme', async () => {
+  await en('sami', async () => {
+    await assert.rejects(livrerCourse(L_1046), /ne vous est pas attribuée/);
+  });
+  await en('amine', async () => {
+    await assert.rejects(livrerCourse(L_1046), /ne vous est pas attribuée/);
+  });
+  await en('karim', async () => {
+    await livrerCourse(L_1046);
+    assert.deepEqual(await lignes(`select etat::text, paye_le is not null as date from public.paiements where commande_id = $1`, [C_1046]),
+      [{ etat: 'paye', date: true }]);
+    assert.equal((await etatDe(C_1046)).etat, 'livree');
+    // course terminée : il peut en accepter une nouvelle
+    await accepterCourse(L_1044);
+  });
 });

@@ -12,11 +12,14 @@ supabase/
     20261113000003_stockage_images.sql US03 : stockage des images (buckets + règles d'accès)
     20261115000001_ouverture_restaurant.sql US08 : ouvert / fermé, pas de commande pour un restaurant fermé
     20261115000002_suppression_categorie_menu.sql US09 : suppression d'une catégorie avec ses plats
+    …
+    20261118000001_courses_livreurs.sql US26-US28 : disponibilité, courses proposées / acceptées / récupérées / livrées
   seed.sql                             jeu de données de test (données des maquettes)
   tests/                               tests automatiques des migrations (PGlite, sans Docker)
 apps/
   client/                              application mobile client (Flutter)
   restaurant/                          espace web du responsable restaurant (React + TypeScript)
+  livreur/                             application mobile livreur (Flutter)
 ```
 
 ## Avancement du backlog
@@ -46,6 +49,10 @@ apps/
 | US21 | Annuler sa commande (appli client) tant qu'elle est « en attente », avec confirmation ; le restaurant voit l'annulation (alerte avec le numéro, la commande quitte la liste) et reçoit une notification | codé : 3 tests Flutter + 2 tests Vitest + 3 tests PGlite, fonction appliquée sur Supabase ; **annulation réelle pas encore vérifiée** (à refaire avec US40) |
 | US22 | Historique des commandes (appli client, icône « Mes commandes » de l'accueil) : commandes en cours puis passées, de la plus récente à la plus ancienne, avec date, nombre d'articles, total et état ; un toucher ouvre le détail | codé : 7 tests Flutter ; essai réel à faire |
 | US24 | Profil du client (icône « Mon profil » de l'accueil) : nom et téléphone modifiables (mêmes règles qu'à l'inscription), e-mail affiché, déconnexion | codé : 6 tests Flutter ; essai réel à faire |
+| US25 | Appli livreur : candidature en 2 étapes (compte, puis type de véhicule, immatriculation et photos de la carte d'identité, du permis et de la carte grise — CIN seule à vélo) ; compte « en attente de validation », écran d'attente avec l'état des documents ; connexion réservée aux livreurs | codé : tests Flutter (appli livreur) + 1 test PGlite ; essai réel à faire |
+| US26 | Disponible / indisponible (interrupteur de l'accueil livreur), enregistré dans la base ; un livreur indisponible, pas encore validé ou bloqué ne reçoit aucune course | codé : tests Flutter + 2 tests PGlite, migration appliquée sur Supabase ; essai réel à faire |
+| US27 | Courses proposées dès que le restaurant accepte la commande : restaurant, adresse du client, gain, paiement (« Payée en ligne » / « À encaisser ») ; « Accepter la course » : un seul livreur (verrou), une course à la fois, elle disparaît chez les autres (temps réel + relecture toutes les 20 s) | codé : tests Flutter + 2 tests PGlite, fonction appliquée sur Supabase ; essai réel à faire |
+| US28 | Course acceptée : « J'ai récupéré la commande » (actif seulement quand la commande est « Prête », en temps réel) → commande « En cours de livraison » ; « Confirmer la livraison » (après « J'ai bien reçu … DT » pour les espèces) → « Livrée », paiement en espèces encaissé ; client prévenu à chaque étape | codé : tests Flutter + 2 tests PGlite, fonctions appliquées sur Supabase ; essai réel à faire |
 
 US01 à US03, US08, US09, US11 à US15, US19 et US21 sont appliquées sur le projet Supabase de Mida (`tpfpuwlgnxhwhezicuto`) ; le jeu de test n'y est pas encore chargé.
 
@@ -183,6 +190,23 @@ flutter run         # se connecte au projet Supabase de Mida (lib/config.dart)
 - Les services sont fournis à tous les écrans par `Dependances.of(context)` (`lib/dependances.dart`) ; les tests utilisent `test/faux_service_mida.dart`.
 
 - Si la compilation Android échoue sur le cache Kotlin (« Could not close incremental caches ») : c'est le projet sur `D:` et le cache pub sur `C:` ; `kotlin.incremental=false` est déjà dans `android/gradle.properties`.
+
+## Application livreur (US25 à US28)
+
+```bash
+cd apps/livreur
+flutter pub get
+flutter test        # candidature, disponibilité, courses, récupération et remise (faux services)
+flutter run         # même projet Supabase que l'appli client (lib/config.dart)
+```
+
+- Paquet Android `tn.mida.mida_livreur`, nom affiché « Mida Livreur ». Thème, composants, règles de saisie et messages d'erreur copiés de l'appli client ; `image_picker` pour les photos des documents (galerie, JPEG 2000 px au plus).
+- **Écran racine** (`EspaceLivreur`) selon le compte : candidature incomplète → « Vos documents » (étape 2) ; en attente ou refusée → écran d'attente (« Actualiser », « Se déconnecter ») ; validée → courses. Les comptes client, responsable, admin ou bloqués sont refusés à la connexion.
+- **Candidature (US25)** : `signUp` avec le rôle `livreur` (le déclencheur d'US02 crée le profil « en attente » et la fiche `livreurs`), puis mise à jour de `livreurs` (véhicule, immatriculation), envoi des photos dans `documents-livreurs/<id>/<type>.jpg` et une ligne `documents_livreur` par document (état forcé à « en attente » par la base). La validation se fera dans le tableau de bord admin (US34) ; d'ici là, par SQL.
+- **Disponibilité (US26)** : `livreurs.disponible`, conservé d'une ouverture à l'autre. La base refuse « disponible » à un compte non validé ; bloquer un livreur le rend indisponible.
+- **Courses (US27, US28)**, migration `20261118000001` : la course (`livraisons`, état `proposee`, gain = `parametres.gain_livreur`) est créée quand le restaurant **accepte** la commande ; les commandes déjà acceptées avant la migration ont reçu la leur. Seuls les livreurs **validés et disponibles** la voient (règle `peut_voir_commande`). Fonctions : `accepter_course` (verrou de la ligne : un seul livreur ; refus si le livreur a déjà une course en cours), `recuperer_course` (seulement si la commande est `prete` → commande `en_livraison`), `livrer_course` (commande `livree`, `livree_le` ; paiement en espèces → `paye`). Le client reçoit « Livreur en route », « Commande en route », « Commande livrée ». `livraisons` est diffusée en temps réel.
+- Une course prise par un autre livreur cesse d'être visible pour les autres : la base n'envoie donc pas d'événement temps réel aux autres livreurs → l'accueil relit la liste toutes les 20 s, et « Accepter » sur une course déjà prise affiche « Cette course a déjà été acceptée par un autre livreur ».
+- Pas encore fait : historique et gains (US42), itinéraire (US41), notification de nouvelle course appli fermée (US43).
 
 ## Espace restaurant web (US05)
 

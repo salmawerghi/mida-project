@@ -10,6 +10,7 @@ import '../widgets/catalogue.dart';
 import '../widgets/composants.dart';
 import '../widgets/panier_widgets.dart';
 import 'connexion_page.dart';
+import 'historique_page.dart';
 import 'inscription_page.dart';
 import 'restaurant_page.dart';
 import 'suivi_page.dart';
@@ -73,6 +74,12 @@ class _AccueilPageState extends State<AccueilPage> {
     _chargerCommandes();
   }
 
+  /// Historique des commandes (US22) ; au retour, les commandes en cours sont relues.
+  Future<void> _ouvrirHistorique() async {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const HistoriquePage()));
+    _chargerCommandes();
+  }
+
   Future<void> _charger() async {
     final mida = Dependances.of(context).mida;
     setState(() => _erreur = null);
@@ -116,6 +123,12 @@ class _AccueilPageState extends State<AccueilPage> {
           ],
         ),
         actions: [
+          if (!widget.visiteur)
+            IconButton(
+              tooltip: 'Mes commandes',
+              icon: const Icon(Icons.receipt_long_rounded, color: Couleurs.nuit),
+              onPressed: _ouvrirHistorique,
+            ),
           const IconePanier(),
           if (!widget.visiteur)
             IconButton(

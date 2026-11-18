@@ -79,6 +79,10 @@ class FauxServiceMida implements ServiceMida {
       [for (final c in suivies.values) if (c.etat.enCours) c];
 
   @override
+  Future<List<CommandeClient>> mesCommandes() =>
+      _repondre([...suivies.values]..sort((a, b) => b.creeeLe.compareTo(a.creeeLe)));
+
+  @override
   void Function() surCommande(String id, void Function() rappel) {
     _abonnes.putIfAbsent(id, () => []).add(rappel);
     return () => _abonnes[id]?.remove(rappel);

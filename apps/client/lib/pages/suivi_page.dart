@@ -126,6 +126,10 @@ class _SuiviPageState extends State<SuiviPage> {
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
                 children: [
                   Text(c.restaurantNom, style: textes.bodyMedium),
+                  Text(
+                    'Passée le ${formaterDate(c.creeeLe)} à ${formaterHeure(c.creeeLe)}',
+                    style: textes.bodyMedium?.copyWith(fontSize: 13),
+                  ),
                   const SizedBox(height: 2),
                   Semantics(
                     liveRegion: true,

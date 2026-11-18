@@ -32,6 +32,9 @@ abstract class ServiceMida {
   /// Commandes du client encore en cours (pour l'accès au suivi depuis l'accueil).
   Future<List<CommandeClient>> commandesEnCours();
 
+  /// Toutes les commandes du client connecté, de la plus récente à la plus ancienne (US22).
+  Future<List<CommandeClient>> mesCommandes();
+
   /// Appelle [rappel] à chaque changement de la commande (temps réel), et à
   /// chaque (re)connexion. Renvoie de quoi se désabonner.
   void Function() surCommande(String id, void Function() rappel);
@@ -131,6 +134,20 @@ class ServiceMidaSupabase implements ServiceMida {
         .eq('client_id', id)
         .inFilter('etat', [for (final e in EtatCommande.values) if (e.enCours) e.code])
         .order('created_at', ascending: false);
+    return [for (final l in lignes) CommandeClient.depuis(l)];
+  }
+
+  @override
+  Future<List<CommandeClient>> mesCommandes() async {
+    final id = _client.auth.currentUser?.id;
+    if (id == null) return const [];
+    // La règle d'accès ne montre déjà que ses commandes ; le filtre garde la liste juste pour un admin.
+    final lignes = await _client
+        .from('commandes')
+        .select(CommandeClient.colonnes)
+        .eq('client_id', id)
+        .order('created_at', ascending: false)
+        .limit(100);
     return [for (final l in lignes) CommandeClient.depuis(l)];
   }
 

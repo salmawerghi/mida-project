@@ -18,6 +18,15 @@ double lireNombre(Object? valeur) {
   throw FormatException('Nombre attendu : $valeur');
 }
 
+const _mois = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+
+/// « 8 nov. » (date locale), avec l'année si ce n'est pas celle de [maintenant] : « 28 déc. 2025 ».
+String formaterDate(DateTime date, {DateTime? maintenant}) {
+  final d = date.toLocal();
+  final annee = (maintenant ?? DateTime.now()).year;
+  return '${d.day} ${_mois[d.month - 1]}${d.year == annee ? '' : ' ${d.year}'}';
+}
+
 /// « 19:05 » (heure locale).
 String formaterHeure(DateTime date) {
   final d = date.toLocal();

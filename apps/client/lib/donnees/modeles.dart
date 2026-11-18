@@ -237,6 +237,9 @@ class CommandeClient {
 
   bool get rembourse => paiementMode == 'carte' && paiementEtat == 'rembourse';
 
+  /// Nombre de plats commandés (quantités additionnées) : « 3 articles ».
+  int get nbArticles => lignes.fold(0, (n, l) => n + l.quantite);
+
   /// Colonnes lues par l'appli (avec le nom du restaurant, les lignes et le paiement).
   static const colonnes = 'id, numero, etat, adresse_livraison, sous_total, frais_livraison, total, remarque, '
       'motif_refus, created_at, acceptee_le, prete_le, livree_le, annulee_le, '

@@ -82,3 +82,21 @@ grant select on storage.buckets to anon, authenticated, service_role;
 
 -- Publication du temps réel (Supabase Realtime) : existe déjà sur un vrai projet
 create publication supabase_realtime;
+
+-- pg_net (requêtes HTTP) : les appels sont seulement notés dans une table (US23)
+create schema net;
+create table net.appels (
+  id      bigserial primary key,
+  url     text,
+  body    jsonb,
+  headers jsonb
+);
+create function net.http_post(url text, body jsonb default '{}'::jsonb, params jsonb default '{}'::jsonb,
+                              headers jsonb default '{}'::jsonb, timeout_milliseconds integer default 5000)
+returns bigint language sql as $$
+  insert into net.appels (url, body, headers) values (url, body, headers) returning id
+$$;
+
+-- Vault : les secrets déchiffrés sont une simple table ici (US23)
+create schema vault;
+create table vault.decrypted_secrets (name text primary key, decrypted_secret text);

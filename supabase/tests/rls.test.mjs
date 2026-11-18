@@ -1421,3 +1421,82 @@ test('US37 · l\'admin règle les frais (pour les commandes suivantes) et les ca
     await assert.rejects(requete(`insert into public.categories_restaurant (nom) values ('Burgers')`), RLS);
   });
 });
+
+// =====================================================================
+// US23 — notifications push (jetons des téléphones + appel de l'Edge Function)
+// =====================================================================
+const JETON = 'fcm-jeton-de-test-0123456789-abcdefghijklmnopqrstuvwxyz';
+const enregistrer = (jeton, plateforme = 'android') =>
+  requete(`select public.enregistrer_jeton($1, $2)`, [jeton, plateforme]);
+const SECRETS_PUSH = `insert into vault.decrypted_secrets values
+  ('push_url', 'https://exemple.supabase.co/functions/v1/envoyer-push'), ('push_secret', 'secret-de-test')`;
+
+test('US23 · le client enregistre le jeton de son téléphone, une seule fois', async () => {
+  await en('youssef', async () => {
+    await enregistrer(JETON);
+    await enregistrer(JETON); // relancement de l'appli : pas de doublon
+    assert.deepEqual(await lignes(`select token, plateforme from public.device_tokens`),
+      [{ token: JETON, plateforme: 'android' }]);
+    await assert.rejects(enregistrer('court'), /Jeton d'appareil invalide/);
+    await assert.rejects(enregistrer(JETON + '-2', 'windows'), /device_tokens_plateforme_check/);
+  });
+  await en(null, async () => {
+    await assert.rejects(enregistrer(JETON), /permission denied/);
+  });
+});
+
+test('US23 · le téléphone passe à un autre compte : le jeton change de propriétaire', async () => {
+  await en('youssef', async () => {
+    await enregistrer(JETON);
+    await db.exec('reset role');
+    await db.query("select set_config('request.jwt.claim.sub', $1, true)", [ids.leila]);
+    await db.exec('set local role authenticated');
+    await enregistrer(JETON);
+    assert.deepEqual(await lignes(`select token from public.device_tokens`), [{ token: JETON }]);
+    await db.exec('reset role');
+    const [j] = await lignes(`select user_id from public.device_tokens where token = $1`, [JETON]);
+    assert.equal(j.user_id, ids.leila);
+  });
+});
+
+test('US23 · à la déconnexion, le client supprime son jeton (et pas celui des autres)', async () => {
+  await en('youssef', async () => {
+    await enregistrer(JETON);
+    await db.exec('reset role');
+    await db.query("select set_config('request.jwt.claim.sub', $1, true)", [ids.leila]);
+    await db.exec('set local role authenticated');
+    assert.equal(await nbModifiees(`delete from public.device_tokens where token = $1`, [JETON]), 0);
+    await db.exec('reset role');
+    await db.query("select set_config('request.jwt.claim.sub', $1, true)", [ids.youssef]);
+    await db.exec('set local role authenticated');
+    assert.equal(await nbModifiees(`delete from public.device_tokens where token = $1`, [JETON]), 1);
+  });
+});
+
+test('US23 · commande acceptée : la notification part en push vers l\'Edge Function', async () => {
+  await en('zitouna', async () => {
+    await requete(`select public.accepter_commande($1)`, [C_1045]);
+    await db.exec('reset role');
+    const appels = await lignes(`select url, body, headers from net.appels`);
+    assert.equal(appels.length, 1);
+    const [n] = await lignes(`select id from public.notifications where commande_id = $1 order by created_at desc limit 1`, [C_1045]);
+    assert.equal(appels[0].url, 'https://exemple.supabase.co/functions/v1/envoyer-push');
+    assert.deepEqual(appels[0].body, { notification_id: n.id });
+    assert.equal(appels[0].headers['x-mida-secret'], 'secret-de-test');
+  }, `${SECRETS_PUSH};
+      insert into public.device_tokens (user_id, token, plateforme) values ('${ids.youssef}', '${JETON}', 'android')`);
+});
+
+test('US23 · pas d\'appel sans téléphone enregistré, ni sans secrets (et la commande passe quand même)', async () => {
+  await en('zitouna', async () => {
+    await requete(`select public.accepter_commande($1)`, [C_1045]);
+    await db.exec('reset role');
+    assert.equal((await lignes(`select count(*)::int as n from net.appels`))[0].n, 0);
+    assert.equal((await etatDe(C_1045)).etat, 'acceptee');
+  }, SECRETS_PUSH);
+  await en('zitouna', async () => {
+    await requete(`select public.accepter_commande($1)`, [C_1045]);
+    await db.exec('reset role');
+    assert.equal((await lignes(`select count(*)::int as n from net.appels`))[0].n, 0);
+  }, `insert into public.device_tokens (user_id, token, plateforme) values ('${ids.youssef}', '${JETON}', 'android')`);
+});

@@ -59,7 +59,11 @@ class ProfilClient {
 }
 
 class ServiceAuthSupabase implements ServiceAuth {
-  ServiceAuthSupabase(this._client);
+  ServiceAuthSupabase(this._client, {this.avantDeconnexion});
+
+  /// Appelé juste avant la déconnexion, encore connecté (US23 : oublier le
+  /// jeton push du téléphone).
+  final Future<void> Function()? avantDeconnexion;
   final SupabaseClient _client;
 
   GoTrueClient get _auth => _client.auth;
@@ -111,7 +115,10 @@ class ServiceAuthSupabase implements ServiceAuth {
   }
 
   @override
-  Future<void> deconnecter() => _auth.signOut();
+  Future<void> deconnecter() async {
+    await avantDeconnexion?.call();
+    await _auth.signOut();
+  }
 
   @override
   Future<void> demanderReinitialisation(String email) => _auth.resetPasswordForEmail(email.trim());

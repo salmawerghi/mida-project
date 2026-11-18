@@ -23,8 +23,12 @@ abstract class ServiceAuth {
 }
 
 class ServiceAuthSupabase implements ServiceAuth {
-  ServiceAuthSupabase(this._client);
+  ServiceAuthSupabase(this._client, {this.avantDeconnexion});
   final SupabaseClient _client;
+
+  /// Appelé juste avant la déconnexion, encore connecté (US23 : oublier le
+  /// jeton push du téléphone).
+  final Future<void> Function()? avantDeconnexion;
 
   GoTrueClient get _auth => _client.auth;
 
@@ -67,7 +71,10 @@ class ServiceAuthSupabase implements ServiceAuth {
   }
 
   @override
-  Future<void> deconnecter() => _auth.signOut();
+  Future<void> deconnecter() async {
+    await avantDeconnexion?.call();
+    await _auth.signOut();
+  }
 
   /// Appli réservée aux livreurs : tout autre compte, ou un compte bloqué,
   /// est déconnecté aussitôt. Un livreur en attente ou refusé peut se

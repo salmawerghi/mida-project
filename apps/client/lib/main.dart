@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -8,6 +10,7 @@ import 'donnees/service_mida.dart';
 import 'pages/accueil_page.dart';
 import 'pages/bienvenue_page.dart';
 import 'panier/panier.dart';
+import 'push/notifications_push.dart';
 import 'theme.dart';
 
 Future<void> main() async {
@@ -16,7 +19,14 @@ Future<void> main() async {
   // elle est restaurée (et rafraîchie) au prochain lancement.
   await Supabase.initialize(url: supabaseUrl, publishableKey: supabaseKey);
   final client = Supabase.instance.client;
-  runApp(AppMida(auth: ServiceAuthSupabase(client), mida: ServiceMidaSupabase(client), panier: Panier()));
+  // Notifications push (US23) : démarrées sans attendre, l'appli s'affiche tout de suite.
+  final push = NotificationsPush(client, roleAttendu: 'client');
+  unawaited(push.demarrer());
+  runApp(AppMida(
+    auth: ServiceAuthSupabase(client, avantDeconnexion: push.oublierAppareil),
+    mida: ServiceMidaSupabase(client),
+    panier: Panier(),
+  ));
 }
 
 class AppMida extends StatelessWidget {
@@ -37,6 +47,7 @@ class AppMida extends StatelessWidget {
       child: MaterialApp(
         title: 'Mida',
         debugShowCheckedModeBanner: false,
+        scaffoldMessengerKey: messagerPush,
         theme: theme ?? construireTheme(),
         home: StreamBuilder<AuthState>(
           stream: auth.changements,

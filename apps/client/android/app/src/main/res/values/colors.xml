@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Bleu Sidi Bou : couleur des notifications (US23) -->
+    <color name="bleu_mida">#1554C0</color>
+</resources>

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -9,6 +11,7 @@ import 'donnees/modeles.dart';
 import 'donnees/service_livreur.dart';
 import 'pages/connexion_page.dart';
 import 'pages/espace_livreur.dart';
+import 'push/notifications_push.dart';
 import 'theme.dart';
 
 Future<void> main() async {
@@ -16,8 +19,11 @@ Future<void> main() async {
   // Session conservée sur le téléphone et restaurée au prochain lancement.
   await Supabase.initialize(url: supabaseUrl, publishableKey: supabaseKey);
   final client = Supabase.instance.client;
+  // Notifications push (US23) : démarrées sans attendre, l'appli s'affiche tout de suite.
+  final push = NotificationsPush(client, roleAttendu: 'livreur');
+  unawaited(push.demarrer());
   runApp(AppLivreur(
-    auth: ServiceAuthSupabase(client),
+    auth: ServiceAuthSupabase(client, avantDeconnexion: push.oublierAppareil),
     livreur: ServiceLivreurSupabase(client),
     choisirDocument: choisirPhoto,
   ));
@@ -52,6 +58,7 @@ class AppLivreur extends StatelessWidget {
       child: MaterialApp(
         title: 'Mida Livreur',
         debugShowCheckedModeBanner: false,
+        scaffoldMessengerKey: messagerPush,
         theme: theme ?? construireTheme(),
         home: StreamBuilder<AuthState>(
           stream: auth.changements,

@@ -15,6 +15,9 @@ supabase/
     …
     20261118000001_courses_livreurs.sql US26-US28 : disponibilité, courses proposées / acceptées / récupérées / livrées
     20261118000002_administration.sql  US32-US37 : décisions de l'administrateur (valider, rejeter, bloquer), bornes des paramètres
+    20261118000003_notifications_push.sql US23 : jetons des téléphones, chaque notification part en push (pg_net)
+  functions/
+    envoyer-push/                      US23 : Edge Function qui envoie les notifications par Firebase (FCM HTTP v1)
   seed.sql                             jeu de données de test (données des maquettes)
   tests/                               tests automatiques des migrations (PGlite, sans Docker)
 apps/
@@ -50,6 +53,7 @@ apps/
 | US20 | Suivi de la commande en temps réel (appli client) : étapes franchies avec leur heure, mise à jour sans action du client, motif affiché si la commande est refusée (et remboursement) ; accès depuis l'accueil | fait : 8 tests Flutter ; essayé sur un vrai téléphone avec l'espace restaurant (acceptation, préparation, prête, refus avec motif n° 1006) |
 | US21 | Annuler sa commande (appli client) tant qu'elle est « en attente », avec confirmation ; le restaurant voit l'annulation (alerte avec le numéro, la commande quitte la liste) et reçoit une notification | codé : 3 tests Flutter + 2 tests Vitest + 3 tests PGlite, fonction appliquée sur Supabase ; **annulation réelle pas encore vérifiée** (à refaire avec US40) |
 | US22 | Historique des commandes (appli client, icône « Mes commandes » de l'accueil) : commandes en cours puis passées, de la plus récente à la plus ancienne, avec date, nombre d'articles, total et état ; un toucher ouvre le détail | fait : 7 tests Flutter ; essayé sur un vrai téléphone |
+| US23 | Notifications push (applis client et livreur) : chaque notification de la base (commande acceptée, en préparation, prête, livreur en route, livrée…) arrive aussi sur le téléphone, appli fermée ; appli ouverte, un bandeau s'affiche | codé : 5 tests PGlite, migration et Edge Function en ligne sur Supabase ; essai réel à faire |
 | US24 | Profil du client (icône « Mon profil » de l'accueil) : nom et téléphone modifiables (mêmes règles qu'à l'inscription), e-mail affiché, déconnexion | codé : 6 tests Flutter ; essai réel à faire |
 | US25 | Appli livreur : candidature en 2 étapes (compte, puis « Avez-vous une moto ? » et « Avez-vous un permis de conduire ? » : moto → immatriculation, permis et carte grise, une moto sans permis est refusée ; sans moto → vélo, carte d'identité seule, plus le permis s'il en a un) ; compte « en attente de validation », écran d'attente avec l'état des documents ; connexion réservée aux livreurs | fait : tests Flutter (appli livreur) + 1 test PGlite ; essayé sur un vrai téléphone le 18/11 (compte testlivreur@gmail.com : moto, 3 photos dans le stockage privé, compte « en attente » ; validé ensuite par SQL faute d'appli admin) |
 | US26 | Disponible / indisponible (interrupteur de l'accueil livreur), enregistré dans la base ; un livreur indisponible, pas encore validé ou bloqué ne reçoit aucune course | fait : tests Flutter + 2 tests PGlite, migration appliquée sur Supabase ; essayé (disponible / indisponible, état conservé) |
@@ -217,6 +221,19 @@ flutter run         # même projet Supabase que l'appli client (lib/config.dart)
 - **Courses (US27, US28)**, migration `20261118000001` : la course (`livraisons`, état `proposee`, gain = `parametres.gain_livreur`) est créée quand le restaurant **accepte** la commande ; les commandes déjà acceptées avant la migration ont reçu la leur. Seuls les livreurs **validés et disponibles** la voient (règle `peut_voir_commande`). Fonctions : `accepter_course` (verrou de la ligne : un seul livreur ; refus si le livreur a déjà une course en cours), `recuperer_course` (seulement si la commande est `prete` → commande `en_livraison`), `livrer_course` (commande `livree`, `livree_le` ; paiement en espèces → `paye`). Le client reçoit « Livreur en route », « Commande en route », « Commande livrée ». `livraisons` est diffusée en temps réel.
 - Une course prise par un autre livreur cesse d'être visible pour les autres : la base n'envoie donc pas d'événement temps réel aux autres livreurs → l'accueil relit la liste toutes les 20 s, et « Accepter » sur une course déjà prise affiche « Cette course a déjà été acceptée par un autre livreur ».
 - Pas encore fait : historique et gains (US42), itinéraire (US41), notification de nouvelle course appli fermée (US43).
+
+## Notifications push (US23)
+
+Chemin d'une notification : une fonction serveur ajoute une ligne dans `notifications` → le déclencheur `envoyer_push` (migration `20261118000003`) appelle, **après** la validation de la transaction (pg_net), l'Edge Function `envoyer-push` en ne lui donnant que l'identifiant → la fonction relit la notification et l'envoie par **Firebase Cloud Messaging** (API HTTP v1) à chaque téléphone du destinataire (`device_tokens`). Les jetons refusés par Firebase (appli désinstallée) sont supprimés. Une panne du push ne bloque jamais une commande.
+
+- **Applis** (`lib/push/notifications_push.dart`, identique dans les deux) : à la connexion, demande l'autorisation (Android 13+), puis enregistre le jeton avec `enregistrer_jeton` (un téléphone qui change de compte change de propriétaire) ; à la déconnexion, le jeton est supprimé. Canal Android « Commandes » en importance haute (`MainActivity.kt`), icône étoile `ic_notification`.
+- **Projet Firebase** : `midaproject`, deux applis Android (`tn.mida.mida_client`, `tn.mida.mida_livreur`).
+- **Fichiers secrets (jamais dans git, dossier `secrets/`)** : `google-services.json` (à copier dans `apps/client/android/app/` et `apps/livreur/android/app/` avant de compiler : sans lui, la compilation échoue), `firebase-service-account.json` (clé du compte de service), `push.env`.
+- **Réglages en ligne** (déjà faits) :
+  - secrets de l'Edge Function : `PUSH_SECRET` et `FIREBASE_SERVICE_ACCOUNT` (le JSON en base64) — `npx supabase secrets set --env-file secrets/push.env` ;
+  - déploiement : `npx supabase functions deploy envoyer-push --no-verify-jwt --use-api` (pas de JWT : c'est l'en-tête `x-mida-secret` qui protège l'appel) ;
+  - Vault : secrets `push_url` (adresse de la fonction) et `push_secret` (même valeur que `PUSH_SECRET`), lus par le déclencheur. Sans eux, rien n'est envoyé.
+- **Limites** : pas de push vers l'espace web restaurant ni l'admin (ils ont déjà le temps réel) ; toucher la notification ouvre l'appli sans aller directement à la commande. `getToken()` est marqué obsolète dans firebase_messaging 17 (au profit de `register()`), on le garde car c'est le jeton qu'attend l'API HTTP v1.
 
 ## Tableau de bord d'administration (US32 à US37)
 

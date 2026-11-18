@@ -6,3 +6,6 @@ node_modules/
 # Clés et fichiers privés (Firebase, Konnect) : jamais dans git
 secrets/
 **/google-services.json
+
+# Fichiers temporaires de la CLI Supabase
+supabase/.temp/

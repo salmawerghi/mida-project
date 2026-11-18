@@ -7,7 +7,7 @@ import 'format.dart';
 
 /// Type de véhicule (type `type_vehicule` de la base).
 enum TypeVehicule {
-  moto('moto', 'Scooter / moto'),
+  moto('moto', 'Moto'),
   velo('velo', 'Vélo'),
   voiture('voiture', 'Voiture');
 
@@ -32,12 +32,25 @@ enum TypeDocument {
   final String libelle;
 }
 
-/// Documents demandés pour un véhicule : la carte d'identité toujours,
-/// le permis et la carte grise pour un véhicule motorisé.
-List<TypeDocument> documentsRequis(TypeVehicule? vehicule) => [
-      TypeDocument.cin,
-      if (vehicule?.motorise ?? true) ...[TypeDocument.permis, TypeDocument.carteGrise],
-    ];
+/// Documents demandés : la carte d'identité toujours ; le permis si le livreur
+/// en a un (obligatoire avec une moto) ; la carte grise pour une moto.
+List<TypeDocument> documentsRequis(TypeVehicule? vehicule, {bool? permis}) {
+  final moto = vehicule?.motorise ?? true;
+  return [
+    TypeDocument.cin,
+    if (moto || permis == true) TypeDocument.permis,
+    if (moto) TypeDocument.carteGrise,
+  ];
+}
+
+/// Message de refus si la réponse aux deux questions de la candidature ne va pas :
+/// livrer en moto demande un permis de conduire.
+String? refusVehicule({required bool? moto, required bool? permis}) {
+  if (moto == true && permis == false) {
+    return 'Un permis de conduire est obligatoire pour livrer en moto. Sans permis, vous pouvez livrer à vélo.';
+  }
+  return null;
+}
 
 /// Photo d'un document choisie sur le téléphone.
 class DocumentChoisi {
@@ -86,7 +99,11 @@ class EtatLivreur {
 
   /// Véhicule renseigné et tous les documents demandés déposés.
   bool get candidatureComplete =>
-      typeVehicule != null && documentsRequis(typeVehicule).every((d) => documents.containsKey(d.code));
+      typeVehicule != null && documentsDemandes.every((d) => documents.containsKey(d.code));
+
+  /// Documents de sa candidature (le permis s'il l'a déposé, même à vélo).
+  List<TypeDocument> get documentsDemandes =>
+      documentsRequis(typeVehicule, permis: documents.containsKey(TypeDocument.permis.code));
 
   /// « Sami » pour « Sami Ben Salah ».
   String get prenom => nom.trim().split(RegExp(r'\s+')).first;

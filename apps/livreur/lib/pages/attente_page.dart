@@ -65,7 +65,7 @@ class _AttentePageState extends State<AttentePage> {
             const SizedBox(height: 20),
             Semantics(header: true, child: Text('Vos documents', style: textes.titleMedium)),
             const SizedBox(height: 8),
-            for (final t in documentsRequis(e.typeVehicule))
+            for (final t in e.documentsDemandes)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 child: Row(children: [

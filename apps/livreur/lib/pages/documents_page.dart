@@ -21,14 +21,21 @@ class DocumentsPage extends StatefulWidget {
 }
 
 class _DocumentsPageState extends State<DocumentsPage> {
-  late TypeVehicule? _vehicule = widget.etat.typeVehicule;
+  /// « Avez-vous une moto ? » : oui = moto, non = vélo (`null` : pas encore répondu).
+  late bool? _moto = widget.etat.typeVehicule?.motorise;
+
+  /// « Avez-vous un permis de conduire ? »
+  late bool? _permis = widget.etat.documents.containsKey(TypeDocument.permis.code) ? true : null;
   late final _immatriculation = TextEditingController(text: widget.etat.immatriculation);
   final _formulaire = GlobalKey<FormState>();
   final _choisis = <TypeDocument, DocumentChoisi>{};
   final _manquants = <TypeDocument>{};
-  bool _vehiculeManquant = false;
+  bool _reponsesManquantes = false;
   bool _enCours = false;
   String? _erreur;
+
+  TypeVehicule? get _vehicule => _moto == null ? null : (_moto! ? TypeVehicule.moto : TypeVehicule.velo);
+  List<TypeDocument> get _requis => documentsRequis(_vehicule, permis: _permis);
 
   @override
   void dispose() {
@@ -48,22 +55,23 @@ class _DocumentsPageState extends State<DocumentsPage> {
   }
 
   Future<void> _envoyer() async {
-    final requis = documentsRequis(_vehicule);
+    final requis = _requis;
+    final refus = refusVehicule(moto: _moto, permis: _permis);
     setState(() {
-      _erreur = null;
-      _vehiculeManquant = _vehicule == null;
+      _erreur = refus;
+      _reponsesManquantes = _moto == null || _permis == null;
       _manquants
         ..clear()
         ..addAll(requis.where((t) => !_choisis.containsKey(t) && !_depose(t)));
     });
     final champsOk = _formulaire.currentState!.validate();
-    if (!champsOk || _vehiculeManquant || _manquants.isNotEmpty) return;
+    if (!champsOk || refus != null || _reponsesManquantes || _manquants.isNotEmpty) return;
     setState(() => _enCours = true);
     try {
       await Dependances.of(context).livreur.envoyerCandidature(
             vehicule: _vehicule!,
-            immatriculation: _immatriculation.text.trim().toUpperCase(),
-            // un document choisi pour un véhicule motorisé n'est pas envoyé pour un vélo
+            immatriculation: _moto == true ? _immatriculation.text.trim().toUpperCase() : null,
+            // un document choisi puis devenu inutile (réponse changée) n'est pas envoyé
             documents: {for (final t in requis) if (_choisis[t] != null) t: _choisis[t]!},
           );
       await widget.apresEnvoi();
@@ -77,7 +85,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
   @override
   Widget build(BuildContext context) {
     final textes = Theme.of(context).textTheme;
-    final vehicule = _vehicule;
+    final refus = refusVehicule(moto: _moto, permis: _permis);
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Couleurs.fond,
@@ -100,29 +108,30 @@ class _DocumentsPageState extends State<DocumentsPage> {
               style: textes.bodyMedium,
             ),
             const SizedBox(height: 20),
-            Semantics(header: true, child: Text('Type de véhicule', style: textes.titleMedium)),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              children: [
-                for (final v in TypeVehicule.values)
-                  ChoiceChip(
-                    label: Text(v.libelle),
-                    selected: vehicule == v,
-                    onSelected: (_) => setState(() {
-                      _vehicule = v;
-                      _vehiculeManquant = false;
-                      _manquants.clear();
-                    }),
-                  ),
-              ],
+            QuestionOuiNon(
+              question: 'Avez-vous une moto ?',
+              aide: 'Sinon, vous livrerez à vélo.',
+              reponse: _moto,
+              manquante: _reponsesManquantes && _moto == null,
+              onChanged: (oui) => setState(() {
+                _moto = oui;
+                _manquants.clear();
+                _erreur = null;
+              }),
             ),
-            if (_vehiculeManquant)
-              const Padding(
-                padding: EdgeInsets.only(top: 6),
-                child: Text('Choisissez votre type de véhicule.', style: TextStyle(color: Couleurs.erreur, fontSize: 13)),
-              ),
-            if (vehicule?.motorise ?? false) ...[
+            const SizedBox(height: 16),
+            QuestionOuiNon(
+              question: 'Avez-vous un permis de conduire ?',
+              reponse: _permis,
+              manquante: _reponsesManquantes && _permis == null,
+              onChanged: (oui) => setState(() {
+                _permis = oui;
+                _manquants.clear();
+                _erreur = null;
+              }),
+            ),
+            if (refus != null) ...[const SizedBox(height: 10), MessageErreur(refus)],
+            if (_moto == true) ...[
               const SizedBox(height: 14),
               ChampEtiquete(
                 etiquette: 'Immatriculation',
@@ -137,7 +146,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
             const SizedBox(height: 20),
             Semantics(header: true, child: Text('Pièces justificatives', style: textes.titleMedium)),
             const SizedBox(height: 8),
-            for (final t in documentsRequis(vehicule)) ...[
+            for (final t in _requis) ...[
               _LigneDocument(
                 type: t,
                 choisi: _choisis[t],
@@ -148,12 +157,55 @@ class _DocumentsPageState extends State<DocumentsPage> {
               const SizedBox(height: 10),
             ],
             Text('Photos nettes, en entier et lisibles (JPEG ou PNG).', style: textes.bodyMedium?.copyWith(fontSize: 13)),
-            if (_erreur != null) ...[const SizedBox(height: 12), MessageErreur(_erreur!)],
+            if (_erreur != null && _erreur != refus) ...[const SizedBox(height: 12), MessageErreur(_erreur!)],
             const SizedBox(height: 20),
             BoutonRelief.harissa(libelle: 'Envoyer ma candidature', enCours: _enCours, onPressed: _envoyer),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Question à deux réponses (« Oui » / « Non ») de la candidature.
+class QuestionOuiNon extends StatelessWidget {
+  const QuestionOuiNon({
+    super.key,
+    required this.question,
+    required this.reponse,
+    required this.onChanged,
+    this.aide,
+    this.manquante = false,
+  });
+  final String question;
+  final String? aide;
+  final bool? reponse;
+  final bool manquante;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final textes = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Semantics(header: true, child: Text(question, style: textes.titleMedium)),
+        if (aide != null) Text(aide!, style: textes.bodyMedium?.copyWith(fontSize: 13)),
+        const SizedBox(height: 8),
+        Wrap(spacing: 8, children: [
+          for (final (oui, libelle) in [(true, 'Oui'), (false, 'Non')])
+            ChoiceChip(
+              label: Text(libelle, semanticsLabel: '$question $libelle'),
+              selected: reponse == oui,
+              onSelected: (_) => onChanged(oui),
+            ),
+        ]),
+        if (manquante)
+          const Padding(
+            padding: EdgeInsets.only(top: 6),
+            child: Text('Répondez à cette question.', style: TextStyle(color: Couleurs.erreur, fontSize: 13)),
+          ),
+      ],
     );
   }
 }

@@ -29,6 +29,10 @@ void main() {
     test('documents demandés selon le véhicule', () {
       expect(documentsRequis(TypeVehicule.moto), [TypeDocument.cin, TypeDocument.permis, TypeDocument.carteGrise]);
       expect(documentsRequis(TypeVehicule.velo), [TypeDocument.cin]);
+      expect(documentsRequis(TypeVehicule.velo, permis: true), [TypeDocument.cin, TypeDocument.permis]);
+      expect(refusVehicule(moto: true, permis: false), contains('obligatoire pour livrer en moto'));
+      expect(refusVehicule(moto: false, permis: false), isNull);
+      expect(refusVehicule(moto: true, permis: true), isNull);
       expect(photo('permis.jpg').taille, '880 Ko');
       expect(photo('scan.PNG').typeMime, 'image/png');
       expect(photo('cin.heic').extension, 'jpg');
@@ -101,18 +105,18 @@ void main() {
       expect(find.byType(DocumentsPage), findsOneWidget);
       expect(find.text('Étape 2 sur 2'), findsOneWidget);
 
-      // rien choisi : véhicule et documents demandés
+      // rien répondu ni choisi : les deux questions et les documents sont demandés
       await defilerJusqua(tester, find.text('Envoyer ma candidature'));
       await tester.tap(find.text('Envoyer ma candidature'));
       await tester.pumpAndSettle();
       expect(livreur.appels, isEmpty);
       expect(find.text('Document obligatoire'), findsNWidgets(3));
-      await tester.scrollUntilVisible(find.text('Choisissez votre type de véhicule.'), -200,
+      await tester.scrollUntilVisible(find.text('Avez-vous une moto ?'), -200,
           scrollable: find.byType(Scrollable).first);
-      expect(find.text('Choisissez votre type de véhicule.'), findsOneWidget);
+      expect(find.text('Répondez à cette question.'), findsNWidgets(2));
 
-      await tester.tap(find.text('Scooter / moto'));
-      await tester.pumpAndSettle();
+      await appuyer(tester, find.bySemanticsLabel('Avez-vous une moto ? Oui'));
+      await appuyer(tester, find.bySemanticsLabel('Avez-vous un permis de conduire ? Oui'));
       await tester.enterText(champ('Immatriculation'), '215 tu 4821');
       for (final doc in ['Carte d\'identité nationale', 'Permis de conduire', 'Carte grise du véhicule']) {
         await defilerJusqua(tester, find.bySemanticsLabel('Ajouter : $doc'));
@@ -130,11 +134,11 @@ void main() {
       expect(find.textContaining('Merci Nour'), findsOneWidget);
     });
 
-    testWidgets('à vélo : seule la carte d\'identité est demandée', (tester) async {
+    testWidgets('sans moto ni permis : à vélo, seule la carte d\'identité est demandée', (tester) async {
       final livreur = FauxServiceLivreur(etat: const EtatLivreur(nom: 'Nour Jebali', etatCompte: 'en_attente'));
       await ouvrirPage(tester, const EspaceLivreur(), livreur: livreur, choisirDocument: () async => photo('cin.png'));
-      await tester.tap(find.text('Vélo'));
-      await tester.pumpAndSettle();
+      await appuyer(tester, find.bySemanticsLabel('Avez-vous une moto ? Non'));
+      await appuyer(tester, find.bySemanticsLabel('Avez-vous un permis de conduire ? Non'));
       expect(find.text('Immatriculation'), findsNothing);
       expect(find.text('Permis de conduire'), findsNothing);
 
@@ -143,12 +147,36 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Document obligatoire'), findsOneWidget);
 
-      await tester.tap(find.bySemanticsLabel('Ajouter : Carte d\'identité nationale'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Envoyer ma candidature'));
-      await tester.pumpAndSettle();
+      await appuyer(tester, find.bySemanticsLabel('Ajouter : Carte d\'identité nationale'));
+      await appuyer(tester, find.text('Envoyer ma candidature'));
       expect(livreur.appels.single, startsWith('candidature:velo:'));
       expect(livreur.appels.single, endsWith(':cin'));
+    });
+
+    testWidgets('une moto sans permis est refusée ; à vélo avec un permis, le permis est demandé', (tester) async {
+      final livreur = FauxServiceLivreur(etat: const EtatLivreur(nom: 'Nour Jebali', etatCompte: 'en_attente'));
+      await ouvrirPage(tester, const EspaceLivreur(), livreur: livreur, choisirDocument: () async => photo('doc.jpg'));
+      await appuyer(tester, find.bySemanticsLabel('Avez-vous une moto ? Oui'));
+      await appuyer(tester, find.bySemanticsLabel('Avez-vous un permis de conduire ? Non'));
+      expect(find.textContaining('Un permis de conduire est obligatoire pour livrer en moto'), findsOneWidget);
+      await tester.enterText(champ('Immatriculation'), '215 TU 4821');
+      for (final doc in ['Carte d\'identité nationale', 'Permis de conduire', 'Carte grise du véhicule']) {
+        await defilerJusqua(tester, find.bySemanticsLabel('Ajouter : $doc'));
+        await appuyer(tester, find.bySemanticsLabel('Ajouter : $doc'));
+      }
+      await appuyer(tester, find.text('Envoyer ma candidature'));
+      expect(livreur.appels, isEmpty);
+
+      // finalement sans moto (il livrera à vélo), mais avec un permis : on le demande
+      await tester.scrollUntilVisible(find.text('Avez-vous une moto ?'), -200, scrollable: find.byType(Scrollable).first);
+      await appuyer(tester, find.bySemanticsLabel('Avez-vous une moto ? Non'));
+      await appuyer(tester, find.bySemanticsLabel('Avez-vous un permis de conduire ? Oui'));
+      expect(find.textContaining('obligatoire pour livrer en moto'), findsNothing);
+      expect(find.text('Carte grise du véhicule'), findsNothing);
+      expect(find.text('Permis de conduire'), findsOneWidget);
+      await defilerJusqua(tester, find.text('Envoyer ma candidature'));
+      await appuyer(tester, find.text('Envoyer ma candidature'));
+      expect(livreur.appels, ['candidature:velo:null:cin,permis']);
     });
 
     testWidgets('candidature refusée : message, pas de courses', (tester) async {

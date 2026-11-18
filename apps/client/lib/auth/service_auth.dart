@@ -37,6 +37,25 @@ abstract class ServiceAuth {
 
   /// Enregistre le nouveau mot de passe (session de récupération ouverte).
   Future<void> changerMotDePasse(String nouveauMotDePasse);
+
+  /// Informations personnelles du client connecté (US24).
+  Future<ProfilClient> profil();
+
+  /// Enregistre le nom et le téléphone (« +216 22 145 870 ») du client connecté.
+  Future<void> modifierProfil({required String nom, required String telephone});
+}
+
+/// Nom, e-mail et téléphone du compte (table `profiles`).
+class ProfilClient {
+  const ProfilClient({required this.nom, required this.email, this.telephone});
+  final String nom;
+  final String email;
+
+  /// « +216 22 145 870 », ou `null` s'il n'a pas été renseigné.
+  final String? telephone;
+
+  /// Les 8 chiffres sans l'indicatif, pour le champ de saisie : « 22 145 870 ».
+  String get telephoneLocal => (telephone ?? '').replaceFirst(RegExp(r'^\+216\s*'), '');
 }
 
 class ServiceAuthSupabase implements ServiceAuth {
@@ -112,6 +131,29 @@ class ServiceAuthSupabase implements ServiceAuth {
   @override
   Future<void> changerMotDePasse(String nouveauMotDePasse) async {
     await _auth.updateUser(UserAttributes(password: nouveauMotDePasse));
+  }
+
+  @override
+  Future<ProfilClient> profil() async {
+    final user = _auth.currentUser;
+    if (user == null) throw const ErreurMida('Votre session a expiré. Reconnectez-vous.');
+    final p = await _client.from('profiles').select('nom, email, telephone').eq('id', user.id).single();
+    return ProfilClient(
+      nom: p['nom'] as String,
+      email: p['email'] as String,
+      telephone: p['telephone'] as String?,
+    );
+  }
+
+  @override
+  Future<void> modifierProfil({required String nom, required String telephone}) async {
+    final user = _auth.currentUser;
+    if (user == null) throw const ErreurMida('Votre session a expiré. Reconnectez-vous.');
+    // La règle d'accès « modification de son propre profil » (US02) le permet ;
+    // le rôle, l'état et l'e-mail restent protégés par le déclencheur proteger_profil.
+    await _client.from('profiles').update({'nom': nom.trim(), 'telephone': telephone}).eq('id', user.id);
+    // Le nom affiché sur l'accueil (« Bonjour, … ») vient des métadonnées du compte.
+    await _auth.updateUser(UserAttributes(data: {'nom': nom.trim(), 'telephone': telephone}));
   }
 
   /// Cette application est réservée aux clients : un compte livreur,

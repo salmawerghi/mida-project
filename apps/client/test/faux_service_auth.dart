@@ -68,6 +68,22 @@ class FauxServiceAuth implements ServiceAuth {
     if (erreurCode != null) throw erreurCode!;
   }
 
+  /// Profil du client connecté (US24) ; `modifierProfil` le remplace.
+  ProfilClient profilActuel =
+      const ProfilClient(nom: 'Amine Belhadj', email: 'amine@mida.test', telephone: '+216 22 145 870');
+
+  /// Levée par `modifierProfil` si elle est fournie.
+  Object? erreurProfil;
+
+  @override
+  Future<ProfilClient> profil() async => profilActuel;
+
+  @override
+  Future<void> modifierProfil({required String nom, required String telephone}) async {
+    if (erreurProfil != null) throw erreurProfil!;
+    profilActuel = ProfilClient(nom: nom, email: profilActuel.email, telephone: telephone);
+  }
+
   var _echecs = 0;
 
   @override

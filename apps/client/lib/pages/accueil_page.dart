@@ -11,6 +11,7 @@ import '../widgets/composants.dart';
 import '../widgets/panier_widgets.dart';
 import 'connexion_page.dart';
 import 'historique_page.dart';
+import 'profil_page.dart';
 import 'inscription_page.dart';
 import 'restaurant_page.dart';
 import 'suivi_page.dart';
@@ -80,6 +81,12 @@ class _AccueilPageState extends State<AccueilPage> {
     _chargerCommandes();
   }
 
+  /// Profil (US24) ; au retour, « Bonjour, … » reprend le nom éventuellement modifié.
+  Future<void> _ouvrirProfil() async {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => ProfilPage(auth: widget.auth)));
+    if (mounted) setState(() {});
+  }
+
   Future<void> _charger() async {
     final mida = Dependances.of(context).mida;
     setState(() => _erreur = null);
@@ -132,9 +139,9 @@ class _AccueilPageState extends State<AccueilPage> {
           const IconePanier(),
           if (!widget.visiteur)
             IconButton(
-              tooltip: 'Se déconnecter',
-              icon: const Icon(Icons.logout_rounded, color: Couleurs.nuit),
-              onPressed: widget.auth.deconnecter,
+              tooltip: 'Mon profil',
+              icon: const Icon(Icons.account_circle_rounded, color: Couleurs.nuit),
+              onPressed: _ouvrirProfil,
             ),
         ],
       ),

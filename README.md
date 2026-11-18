@@ -45,6 +45,7 @@ apps/
 | US20 | Suivi de la commande en temps réel (appli client) : étapes franchies avec leur heure, mise à jour sans action du client, motif affiché si la commande est refusée (et remboursement) ; accès depuis l'accueil | fait : 8 tests Flutter ; essayé sur un vrai téléphone avec l'espace restaurant (acceptation, préparation, prête, refus avec motif n° 1006) |
 | US21 | Annuler sa commande (appli client) tant qu'elle est « en attente », avec confirmation ; le restaurant voit l'annulation (alerte avec le numéro, la commande quitte la liste) et reçoit une notification | codé : 3 tests Flutter + 2 tests Vitest + 3 tests PGlite, fonction appliquée sur Supabase ; **annulation réelle pas encore vérifiée** (à refaire avec US40) |
 | US22 | Historique des commandes (appli client, icône « Mes commandes » de l'accueil) : commandes en cours puis passées, de la plus récente à la plus ancienne, avec date, nombre d'articles, total et état ; un toucher ouvre le détail | codé : 7 tests Flutter ; essai réel à faire |
+| US24 | Profil du client (icône « Mon profil » de l'accueil) : nom et téléphone modifiables (mêmes règles qu'à l'inscription), e-mail affiché, déconnexion | codé : 6 tests Flutter ; essai réel à faire |
 
 US01 à US03, US08, US09, US11 à US15, US19 et US21 sont appliquées sur le projet Supabase de Mida (`tpfpuwlgnxhwhezicuto`) ; le jeu de test n'y est pas encore chargé.
 
@@ -173,6 +174,11 @@ flutter run         # se connecte au projet Supabase de Mida (lib/config.dart)
 - `HistoriquePage` (maquette « Client · Mes commandes »), ouverte par l'icône « Mes commandes » de l'accueil (clients connectés seulement) : section **En cours** puis **Commandes passées**, chacune de la plus récente à la plus ancienne. Chaque carte : restaurant, « n° 1047 · 16 nov. · 3 articles », total et pastille d'état (Livrée en vert, Refusée / Refusée · remboursée en rouge, Annulée en gris, En attente en doré, les autres en bleu).
 - Un toucher ouvre le **détail** : c'est l'écran de suivi (US20), qui montre aussi les commandes terminées (plats, montants, adresse, paiement, motif de refus) et la date « Passée le 16 nov. à 19:00 ». Au retour, la liste est relue ; tirer vers le bas la relit aussi.
 - Lecture : `mesCommandes()` = `commandes` du client, triées par `created_at` décroissant, 100 au plus (même sélection que le suivi). Aucune commande : « Vous n'avez pas encore passé de commande. » et « Découvrir les restaurants ».
+
+### Profil du client (US24)
+
+- `ProfilPage` (maquette « Client · Profil »), ouverte par l'icône « Mon profil » de l'accueil (elle remplace l'ancienne icône de déconnexion) : initiales, nom et e-mail, puis le formulaire **Nom et prénom** et **Téléphone** (+216, 8 chiffres, mêmes contrôles qu'à l'inscription). L'e-mail est affiché sans être modifiable (il sert d'identifiant). « Enregistrer » → « Vos informations sont enregistrées. » ; « Se déconnecter » referme les écrans et revient à la page de bienvenue.
+- Enregistrement : mise à jour de `profiles` (nom, téléphone ; la règle « modification de son propre profil » d'US02 le permet, le rôle, l'état et l'e-mail restent protégés) puis des métadonnées du compte (`updateUser`), d'où vient le « Bonjour, … » de l'accueil. Pas de migration.
 
 - Les services sont fournis à tous les écrans par `Dependances.of(context)` (`lib/dependances.dart`) ; les tests utilisent `test/faux_service_mida.dart`.
 

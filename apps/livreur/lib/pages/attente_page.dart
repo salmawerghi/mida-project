@@ -34,6 +34,7 @@ class _AttentePageState extends State<AttentePage> {
     final textes = Theme.of(context).textTheme;
     final e = widget.etat;
     final refuse = e.etatCompte == 'rejete';
+    final bloque = e.etatCompte == 'bloque';
     return Scaffold(
       body: SafeArea(
         child: ListView(
@@ -42,13 +43,15 @@ class _AttentePageState extends State<AttentePage> {
             Center(child: SvgPicture.asset('assets/illustrations/the.svg', width: 120, height: 120)),
             const SizedBox(height: 16),
             Text(
-              refuse ? 'Candidature non retenue' : 'En attente de validation',
+              bloque ? 'Compte suspendu' : refuse ? 'Candidature non retenue' : 'En attente de validation',
               style: textes.headlineMedium,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
-              refuse
+              bloque
+                  ? 'Votre compte a été suspendu par l\'équipe Mida. Contactez le support pour en savoir plus.'
+                  : refuse
                   ? 'Désolés ${e.prenom}, votre candidature n\'a pas été acceptée. '
                       'Contactez le support Mida pour en savoir plus.'
                   : 'Merci ${e.prenom}, votre candidature est envoyée. Un administrateur vérifie vos documents : '
@@ -56,7 +59,7 @@ class _AttentePageState extends State<AttentePage> {
               style: textes.bodyMedium,
               textAlign: TextAlign.center,
             ),
-            if (!refuse) ...[
+            if (!refuse && !bloque) ...[
               const SizedBox(height: 20),
               _Etape(libelle: 'Candidature reçue', faite: true),
               _Etape(libelle: 'Vérification des documents', faite: false, actuelle: true),
@@ -97,7 +100,7 @@ class _AttentePageState extends State<AttentePage> {
                 ),
               ),
             const SizedBox(height: 24),
-            if (!refuse) BoutonRelief(libelle: 'Actualiser', enCours: _enCours, onPressed: _actualiser),
+            if (!refuse && !bloque) BoutonRelief(libelle: 'Actualiser', enCours: _enCours, onPressed: _actualiser),
             const SizedBox(height: 8),
             TextButton(onPressed: Dependances.of(context).auth.deconnecter, child: const Text('Se déconnecter')),
           ],

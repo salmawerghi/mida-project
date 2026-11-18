@@ -1,0 +1,318 @@
+/* Tableau de bord d'administration — compléments à index.css (repris de l'espace restaurant). */
+
+.admin-titre {
+  margin: 0;
+}
+.admin-section {
+  margin-top: 8px;
+}
+.admin-barre {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.admin-barre h2 {
+  margin: 0;
+}
+.admin-compte {
+  display: inline-block;
+  min-width: 28px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--harissa);
+  color: #fff;
+  font-size: 15px;
+  text-align: center;
+  vertical-align: middle;
+}
+.admin-recherche {
+  max-width: 320px;
+}
+.admin-filtres {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.admin-filtres .saisie {
+  width: auto;
+  min-width: 180px;
+}
+
+/* Vue d'ensemble */
+.admin-chiffres {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 18px;
+}
+.admin-chiffre {
+  padding: 22px;
+}
+.admin-chiffre-valeur {
+  font-family: var(--titre);
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--nuit);
+  margin: 4px 0;
+}
+.admin-a-traiter ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.admin-a-traiter a {
+  display: block;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: var(--fond);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* Listes et tableaux */
+.admin-demandes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.admin-demande {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 22px;
+}
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 6px 0 var(--bordure);
+}
+.admin-table th,
+.admin-table td {
+  padding: 12px 14px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--bordure);
+}
+.admin-table th {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--texte-doux);
+  background: var(--fond);
+}
+.admin-ligne-choisie td {
+  background: var(--bleu-clair);
+}
+
+/* États */
+.etat {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  background: #e6eefb;
+  color: var(--bleu-fonce);
+  white-space: nowrap;
+}
+.etat-actif,
+.etat-livree {
+  background: #e3f4ea;
+  color: #14552f;
+}
+.etat-en_attente {
+  background: var(--dore-clair);
+  color: #6b4a00;
+}
+.etat-bloque,
+.etat-rejete,
+.etat-refusee {
+  background: var(--harissa-pale);
+  color: var(--harissa-fonce);
+}
+.etat-annulee {
+  background: #eef1f6;
+  color: var(--texte-doux);
+}
+.lien-danger {
+  color: var(--harissa) !important;
+}
+.admin-confirmation {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+/* Livreurs */
+.admin-candidatures {
+  display: grid;
+  grid-template-columns: minmax(200px, 280px) 1fr;
+  gap: 18px;
+  align-items: start;
+}
+@media (max-width: 800px) {
+  .admin-candidatures {
+    grid-template-columns: 1fr;
+  }
+}
+.admin-liste-candidats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.admin-candidat {
+  width: 100%;
+  display: grid;
+  gap: 2px;
+  text-align: left;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 2px solid var(--bordure);
+  background: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+.admin-candidat-choisi {
+  border-color: var(--bleu);
+}
+.admin-candidature {
+  display: grid;
+  gap: 12px;
+}
+.admin-candidature h3,
+.admin-candidature h4 {
+  margin: 0;
+}
+.admin-documents {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+.admin-document {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 16px;
+  background: var(--fond);
+}
+.admin-document-image {
+  width: 100%;
+  max-height: 160px;
+  object-fit: contain;
+  border-radius: 10px;
+  background: #fff;
+}
+
+/* Commandes */
+.admin-commandes {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 18px;
+}
+@media (min-width: 1100px) {
+  .admin-commandes:has(.admin-detail) {
+    grid-template-columns: 1fr 380px;
+    align-items: start;
+  }
+}
+.admin-detail h2,
+.admin-detail h3 {
+  margin: 0;
+}
+.admin-detail {
+  display: grid;
+  gap: 10px;
+  padding: 22px;
+}
+.admin-lignes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.admin-lignes li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+.admin-total {
+  border-top: 1px solid var(--bordure);
+  font-weight: 700;
+}
+.admin-details {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+  margin: 0;
+}
+.admin-details dt {
+  color: var(--texte-doux);
+}
+.admin-details dd {
+  margin: 0;
+  font-weight: 600;
+}
+.admin-demande-page {
+  display: grid;
+  gap: 18px;
+  max-width: 760px;
+}
+.admin-demande-page .carte {
+  display: grid;
+  gap: 12px;
+}
+
+/* Paramètres */
+.admin-parametres {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+.admin-parametres .carte {
+  display: grid;
+  gap: 14px;
+}
+.admin-ajout {
+  display: flex;
+  gap: 10px;
+}
+.admin-categories {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.admin-categorie {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: var(--fond);
+}
+.admin-categorie-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}

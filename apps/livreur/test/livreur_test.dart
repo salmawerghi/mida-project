@@ -179,6 +179,15 @@ void main() {
       expect(livreur.appels, ['candidature:velo:null:cin,permis']);
     });
 
+    testWidgets('compte bloqué : « Compte suspendu », pas de courses', (tester) async {
+      final livreur = FauxServiceLivreur(etat: const EtatLivreur(nom: 'Sami Ben Salah', etatCompte: 'bloque',
+          typeVehicule: TypeVehicule.moto, documents: {'cin': 'valide', 'permis': 'valide', 'carte_grise': 'valide'}));
+      await ouvrirPage(tester, const EspaceLivreur(), livreur: livreur);
+      expect(find.text('Compte suspendu'), findsOneWidget);
+      expect(find.text('Actualiser'), findsNothing);
+      expect(find.byType(CoursesPage), findsNothing);
+    });
+
     testWidgets('candidature refusée : message, pas de courses', (tester) async {
       final livreur = FauxServiceLivreur(etat: const EtatLivreur(nom: 'Nour Jebali', etatCompte: 'rejete',
           typeVehicule: TypeVehicule.velo, documents: {'cin': 'refuse'}));

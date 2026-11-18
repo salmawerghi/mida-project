@@ -14,12 +14,14 @@ supabase/
     20261115000002_suppression_categorie_menu.sql US09 : suppression d'une catégorie avec ses plats
     …
     20261118000001_courses_livreurs.sql US26-US28 : disponibilité, courses proposées / acceptées / récupérées / livrées
+    20261118000002_administration.sql  US32-US37 : décisions de l'administrateur (valider, rejeter, bloquer), bornes des paramètres
   seed.sql                             jeu de données de test (données des maquettes)
   tests/                               tests automatiques des migrations (PGlite, sans Docker)
 apps/
   client/                              application mobile client (Flutter)
   restaurant/                          espace web du responsable restaurant (React + TypeScript)
   livreur/                             application mobile livreur (Flutter)
+  admin/                               tableau de bord d'administration (React + TypeScript)
 ```
 
 ## Avancement du backlog
@@ -53,6 +55,13 @@ apps/
 | US26 | Disponible / indisponible (interrupteur de l'accueil livreur), enregistré dans la base ; un livreur indisponible, pas encore validé ou bloqué ne reçoit aucune course | fait : tests Flutter + 2 tests PGlite, migration appliquée sur Supabase ; essayé (disponible / indisponible, état conservé) |
 | US27 | Courses proposées dès que le restaurant accepte la commande : restaurant, adresse du client, gain, paiement (« Payée en ligne » / « À encaisser ») ; « Accepter la course » : un seul livreur (verrou), une course à la fois, elle disparaît chez les autres (temps réel + relecture toutes les 20 s) | fait : tests Flutter + 2 tests PGlite, fonction appliquée sur Supabase ; essayé (courses 1001, 1004, 1005 proposées, n° 1001 acceptée) |
 | US28 | Course acceptée : « J'ai récupéré la commande » (actif seulement quand la commande est « Prête », en temps réel) → commande « En cours de livraison » ; « Confirmer la livraison » (après « J'ai bien reçu … DT » pour les espèces) → « Livrée », paiement en espèces encaissé ; client prévenu à chaque étape | fait : tests Flutter + 2 tests PGlite, fonctions appliquées sur Supabase ; essayé (n° 1001 récupérée puis livrée, espèces payées, 3 notifications au client) |
+| US29 | Paiement à la livraison (appli livreur) : « Payée en ligne » ou « À encaisser · montant » sur chaque course ; « J'ai bien reçu … DT » puis la remise font passer le paiement à « payé » | fait avec US28 ; essayé (n° 1001, espèces payées) |
+| US32 | Tableau de bord admin (`apps/admin`) : connexion réservée aux administrateurs, tout autre compte refusé (« Ce compte n'a pas le rôle administrateur… ») ; vue d'ensemble (commandes du jour, chiffre d'affaires 7 j, utilisateurs, taux de refus, demandes à traiter) | codé : tests Vitest ; essai réel à faire (compte admin à créer) |
+| US33 | Restaurants : demandes en attente, page « Examiner » (responsable, téléphone, e-mail, catégorie, adresse), « Valider le restaurant » ou « Rejeter » avec motif obligatoire ; responsable prévenu ; validé → visible des clients | codé : tests Vitest + 2 tests PGlite, fonction appliquée sur Supabase ; essai réel à faire |
+| US34 | Livreurs : candidatures avec leurs documents (aperçu et ouverture par adresse temporaire du stockage privé), valider ou rejeter avec motif ; livreur prévenu, validé → peut se mettre disponible | codé : tests Vitest + 2 tests PGlite, fonction appliquée sur Supabase ; essai réel à faire |
+| US35 | Bloquer / réactiver (avec confirmation) un client, un livreur ou un restaurant (son responsable) ; un compte bloqué ne peut plus se connecter ni agir ; restaurant bloqué fermé, livreur bloqué indisponible | codé : tests Vitest + 1 test PGlite, fonction appliquée sur Supabase ; essai réel à faire |
+| US36 | Commandes : filtres par état, restaurant et date ; détail avec plats, total, mode, état, montant et référence du paiement, livreur | codé : tests Vitest + 1 test PGlite ; essai réel à faire |
+| US37 | Paramètres : frais de livraison, commission, gain du livreur (pour les commandes suivantes) ; catégories de restaurants (ajouter, renommer, supprimer), utilisées par le filtre du catalogue client | codé : tests Vitest + 1 test PGlite ; essai réel à faire |
 
 US01 à US03, US08, US09, US11 à US15, US19 et US21 sont appliquées sur le projet Supabase de Mida (`tpfpuwlgnxhwhezicuto`) ; le jeu de test n'y est pas encore chargé.
 
@@ -208,6 +217,21 @@ flutter run         # même projet Supabase que l'appli client (lib/config.dart)
 - **Courses (US27, US28)**, migration `20261118000001` : la course (`livraisons`, état `proposee`, gain = `parametres.gain_livreur`) est créée quand le restaurant **accepte** la commande ; les commandes déjà acceptées avant la migration ont reçu la leur. Seuls les livreurs **validés et disponibles** la voient (règle `peut_voir_commande`). Fonctions : `accepter_course` (verrou de la ligne : un seul livreur ; refus si le livreur a déjà une course en cours), `recuperer_course` (seulement si la commande est `prete` → commande `en_livraison`), `livrer_course` (commande `livree`, `livree_le` ; paiement en espèces → `paye`). Le client reçoit « Livreur en route », « Commande en route », « Commande livrée ». `livraisons` est diffusée en temps réel.
 - Une course prise par un autre livreur cesse d'être visible pour les autres : la base n'envoie donc pas d'événement temps réel aux autres livreurs → l'accueil relit la liste toutes les 20 s, et « Accepter » sur une course déjà prise affiche « Cette course a déjà été acceptée par un autre livreur ».
 - Pas encore fait : historique et gains (US42), itinéraire (US41), notification de nouvelle course appli fermée (US43).
+
+## Tableau de bord d'administration (US32 à US37)
+
+```bash
+cd apps/admin
+npm install
+npm test            # Vitest : connexion, restaurants, livreurs, clients, commandes, paramètres
+npm run dev -- --port 5174
+```
+
+- Même base technique et même style que l'espace restaurant (Vite + React + TypeScript + react-router + supabase-js ; `index.css` repris, compléments dans `admin.css`). Session gardée dans l'onglet (`sessionStorage`) : elle se ferme avec le navigateur.
+- **Accès** : seul un compte `admin` non bloqué entre ; tout autre compte est déconnecté avec « Ce compte n'a pas le rôle administrateur… ». Un compte admin ne se crée pas par inscription : on passe un compte existant en `role = 'admin'` par SQL.
+- **Décisions** (migration `20261118000002`) : `admin_decider_restaurant(id, valider, motif)` (restaurant et compte du responsable, motif obligatoire pour un rejet, notification), `admin_decider_livreur(id, valider, motif)` (documents et compte, carte d'identité exigée pour valider, notification), `admin_bloquer_compte(id, bloquer)` (un responsable bloqué bloque son restaurant, qui se ferme ; la réactivation le rouvre aux commandes ; un compte admin ne peut pas être bloqué). Fonctions **security invoker** : elles s'exécutent avec les droits de l'appelant (les règles d'accès s'appliquent) et vérifient en plus qu'il est administrateur.
+- **Documents des livreurs** : lus dans le stockage privé par une adresse signée valable 10 minutes (`createSignedUrl`).
+- **Paramètres** : `parametres` (frais ≤ 50 DT, gain ≤ 50 DT, commission 0-100 %) ; `passer_commande` copie les frais au moment de la commande, donc un changement ne touche que les commandes suivantes.
 
 ## Espace restaurant web (US05)
 

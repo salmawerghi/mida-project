@@ -333,7 +333,8 @@ test('US02 · les fonctions serveur (service_role) peuvent modifier les champs p
     assert.equal(await nbModifiees(`update public.profiles set etat_compte = 'actif' where email = 'yassine@mida.test'`), 1);
     assert.equal(await nbModifiees(`update public.restaurants set etat = 'actif' where nom = 'Lella Béya'`), 1);
     assert.equal(await nbModifiees(`update public.documents_livreur set etat = 'valide' where etat = 'en_attente'`), 3);
-    assert.equal(await nbModifiees(`update public.notifications set message = 'texte serveur'`), 3);
+    // 3 du jeu de test + 3 créées par les déclencheurs d'US38/US43 (avis n° 1042, course n° 1044)
+    assert.equal(await nbModifiees(`update public.notifications set message = 'texte serveur'`), 6);
   } finally {
     await fin();
   }
@@ -1479,7 +1480,7 @@ test('US23 · commande acceptée : la notification part en push vers l\'Edge Fun
     await db.exec('reset role');
     const appels = await lignes(`select url, body, headers from net.appels`);
     assert.equal(appels.length, 1);
-    const [n] = await lignes(`select id from public.notifications where commande_id = $1 order by created_at desc limit 1`, [C_1045]);
+    const [n] = await lignes(`select id from public.notifications where commande_id = $1 and destinataire_id = $2`, [C_1045, ids.youssef]);
     assert.equal(appels[0].url, 'https://exemple.supabase.co/functions/v1/envoyer-push');
     assert.deepEqual(appels[0].body, { notification_id: n.id });
     assert.equal(appels[0].headers['x-mida-secret'], 'secret-de-test');
@@ -1499,4 +1500,130 @@ test('US23 · pas d\'appel sans téléphone enregistré, ni sans secrets (et la 
     await db.exec('reset role');
     assert.equal((await lignes(`select count(*)::int as n from net.appels`))[0].n, 0);
   }, `insert into public.device_tokens (user_id, token, plateforme) values ('${ids.youssef}', '${JETON}', 'android')`);
+});
+
+// =====================================================================
+// US38 / US48 — avis du client après la livraison
+// =====================================================================
+const noter = (commande, noteResto, comResto = null, noteLivreur = null, comLivreur = null) =>
+  requete(`select public.noter_commande($1, $2, $3, $4, $5)`, [commande, noteResto, comResto, noteLivreur, comLivreur]);
+const avisDe = (commande) => lignes(
+  `select note, commentaire, restaurant_id is not null as resto, livreur_id is not null as livreur
+   from public.avis where commande_id = $1 order by resto desc`, [commande]);
+const C_1042 = '60000000-0000-4000-8000-000000001042';           // livrée et déjà notée
+
+test('US38 · le client note le restaurant et le livreur d\'une commande livrée ; ils sont prévenus', async () => {
+  await en('amine', async () => {
+    await noter(C_1040, 4, '  Brik bien croustillante  ', 5, '');
+    assert.deepEqual(await avisDe(C_1040), [
+      { note: 4, commentaire: 'Brik bien croustillante', resto: true, livreur: false },
+      { note: 5, commentaire: null, resto: false, livreur: true },
+    ]);
+    await db.exec('reset role');
+    const notifs = await lignes(`select p.email, n.titre, n.message, n.type from public.notifications n
+      join public.profiles p on p.id = n.destinataire_id where n.type = 'avis' and n.commande_id = $1 order by p.email`, [C_1040]);
+    assert.deepEqual(notifs, [
+      { email: 'babsouika@mida.test', titre: 'Nouvel avis ★★★★☆', message: 'Commande n° 1040, 4/5 : « Brik bien croustillante »', type: 'avis' },
+      { email: 'sami@mida.test', titre: 'Nouvel avis ★★★★★', message: 'Un client a noté la commande n° 1040 : 5/5.', type: 'avis' },
+    ]);
+  });
+});
+
+test('US38 · la note du livreur est facultative ; une seule fois par commande', async () => {
+  await en('amine', async () => {
+    await noter(C_1040, 3);
+    assert.equal((await avisDe(C_1040)).length, 1);
+    await assert.rejects(noter(C_1040, 5), /déjà donné votre avis/);
+    await assert.rejects(noter(C_1042, 5), /déjà donné votre avis/);
+  });
+});
+
+test('US38 · refus : commande pas encore livrée, d\'un autre client, note hors 1-5, commentaire trop long', async () => {
+  await en('amine', async () => {
+    await assert.rejects(noter(C_1046, 5), /une fois la commande livrée/);
+    await assert.rejects(noter(C_1040, 0), /de 1 à 5 étoiles/);
+    await assert.rejects(noter(C_1040, null), /de 1 à 5 étoiles/);
+    await assert.rejects(noter(C_1040, 4, null, 6), /de 1 à 5 étoiles/);
+    await assert.rejects(noter(C_1040, 4, 'x'.repeat(501)), /500 caractères/);
+    assert.deepEqual(await avisDe(C_1040), []);
+  });
+  await en('leila', async () => {
+    await assert.rejects(noter(C_1040, 5), /Commande introuvable/);
+  });
+  await en(null, async () => {
+    await assert.rejects(noter(C_1040, 5), /permission denied/);
+  });
+});
+
+test('US48 · le restaurant lit les avis reçus, avec le nom du client et le numéro de commande', async () => {
+  await en('zitouna', async () => {
+    const avis = await lignes(`select a.note, a.commentaire, c.numero::int as numero, p.nom is not null as nom_visible
+      from public.avis a join public.commandes c on c.id = a.commande_id
+      join public.profiles p on p.id = a.client_id
+      where a.restaurant_id = $1`, [R_ZITOUNA]);
+    assert.deepEqual(avis, [{ note: 5, commentaire: 'Couscous généreux, comme chez ma grand-mère. Merci !', numero: 1042, nom_visible: true }]);
+  });
+});
+
+// =====================================================================
+// US39 — historique des commandes du restaurant
+// =====================================================================
+test('US39 · le restaurant filtre ses commandes par état et par date, sans voir celles des autres', async () => {
+  await en('zitouna', async () => {
+    const toutes = (await lignes(`select numero::int as numero from public.commandes order by created_at desc`)).map((r) => r.numero);
+    assert.deepEqual(toutes, [1045, 1044, 1042]);
+    const livrees = await lignes(`select numero::int as numero, total::text as total from public.commandes
+      where etat = 'livree' and created_at >= now() - interval '7 days' order by created_at desc`);
+    assert.deepEqual(livrees, [{ numero: 1042, total: '33.500' }]);
+  });
+});
+
+// =====================================================================
+// US42 — historique des courses et gains du livreur
+// =====================================================================
+test('US42 · le livreur voit ses courses livrées, ses gains et sa note ; pas celles des autres', async () => {
+  await en('sami', async () => {
+    const courses = await lignes(`select c.numero::int as numero, r.nom, l.gain_livreur::text as gain
+      from public.livraisons l join public.commandes c on c.id = l.commande_id
+      join public.restaurants r on r.id = c.restaurant_id
+      where l.livreur_id = auth.uid() and l.etat = 'livree' order by l.livree_le desc`);
+    assert.deepEqual(courses.map((c) => [c.numero, c.gain]), [[1042, '2.000'], [1040, '2.000']]);
+    assert.equal(courses[0].nom, 'Dar Zitouna');
+    const [note] = await lignes(`select avg(note)::numeric(3,1)::text as note, count(*)::int as nb from public.avis where livreur_id = auth.uid()`);
+    assert.deepEqual(note, { note: '4.0', nb: 1 });
+    assert.deepEqual(await lignes(`select 1 from public.livraisons where commande_id = $1`, [C_1046]), []);
+  });
+});
+
+// =====================================================================
+// US43 — notification de chaque nouvelle course
+// =====================================================================
+test('US43 · une nouvelle course est annoncée aux livreurs validés, disponibles et libres seulement', async () => {
+  await en('zitouna', async () => {
+    await requete(`select public.accepter_commande($1)`, [C_1045]);
+    await db.exec('reset role');
+    const notifs = await lignes(`select p.email, n.titre, n.message from public.notifications n
+      join public.profiles p on p.id = n.destinataire_id where n.type = 'course' and n.commande_id = $1`, [C_1045]);
+    // Karim est occupé (n° 1046), Yassine pas encore validé
+    assert.equal(notifs.length, 1);
+    assert.equal(notifs[0].email, 'sami@mida.test');
+    assert.equal(notifs[0].titre, 'Nouvelle course');
+    assert.match(notifs[0].message, /^Dar Zitouna \(.+\) → 27, avenue de Paris, Tunis · gain 2,000 DT$/);
+  });
+  await en('zitouna', async () => {
+    await requete(`select public.accepter_commande($1)`, [C_1045]);
+    await db.exec('reset role');
+    assert.equal((await lignes(`select count(*)::int as n from public.notifications where type = 'course' and commande_id = $1`, [C_1045]))[0].n, 0);
+  }, `update public.livreurs set disponible = false where id = '${ids.sami}'`);
+});
+
+test('US43 · la notification de course part en push vers le téléphone du livreur', async () => {
+  await en('zitouna', async () => {
+    await requete(`select public.accepter_commande($1)`, [C_1045]);
+    await db.exec('reset role');
+    const [n] = await lignes(`select id from public.notifications where type = 'course' and commande_id = $1`, [C_1045]);
+    const appels = await lignes(`select body from net.appels`);
+    assert.ok(appels.some((a) => a.body.notification_id === n.id));
+  }, `${SECRETS_PUSH};
+      insert into public.device_tokens (user_id, token, plateforme) values ('${ids.sami}', '${JETON}', 'android')`);
 });

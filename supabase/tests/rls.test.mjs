@@ -1627,3 +1627,168 @@ test('US43 · la notification de course part en push vers le téléphone du livr
   }, `${SECRETS_PUSH};
       insert into public.device_tokens (user_id, token, plateforme) values ('${ids.sami}', '${JETON}', 'android')`);
 });
+
+// =====================================================================
+// US44 — statistiques d'un restaurant
+// =====================================================================
+const statsResto = async (restaurant, jours = 30) =>
+  (await lignes(`select public.statistiques_restaurant($1, $2) as s`, [restaurant, jours]))[0].s;
+
+test('US44 · le restaurant voit ses ventes, ses commandes par jour et ses plats les plus vendus', async () => {
+  await en('zitouna', async () => {
+    const s = await statsResto(R_ZITOUNA);
+    // 30 jours : n° 1042 (livrée), 1044 (en préparation), 1045 (en attente)
+    assert.equal(s.commandes, 3);
+    assert.equal(s.livrees, 1);
+    assert.equal(s.refusees, 0);
+    assert.equal(Number(s.ventes), 31);
+    assert.equal(Number(s.panier_moyen), 31);
+    assert.equal(Number(s.commission_pct), 10);
+    assert.equal(Number(s.commission), 3.1);
+    assert.equal(s.par_jour.length, 30);
+    assert.equal(s.par_jour.reduce((n, j) => n + j.commandes, 0), 3);
+    assert.deepEqual(s.top_plats.map((p) => [p.nom, p.quantite, Number(p.ventes)]),
+      [['Couscous à l\'agneau', 1, 18], ['Couscous aux légumes', 1, 13]]);
+    assert.equal(Number(s.note_moyenne), 5);
+    assert.equal(s.nb_avis, 1);
+    // une période plus courte : la commande livrée il y a 5 jours n'y est plus
+    const jour = await statsResto(R_ZITOUNA, 1);
+    assert.equal(jour.livrees, 0);
+    assert.equal(jour.par_jour.length, 1);
+  });
+});
+
+test('US44 · un restaurant ne voit pas les chiffres d\'un autre ; période bornée', async () => {
+  await en('zitouna', async () => {
+    const s = await statsResto(R_KANOUN);
+    assert.equal(s.commandes, 0);
+    assert.equal(Number(s.ventes), 0);
+    await assert.rejects(statsResto(R_ZITOUNA, 0), /Période invalide/);
+    await assert.rejects(statsResto(R_ZITOUNA, 400), /Période invalide/);
+  });
+  await en(null, async () => {
+    await assert.rejects(statsResto(R_ZITOUNA), /permission denied/);
+  });
+});
+
+// =====================================================================
+// US45 — statistiques globales (administrateur)
+// =====================================================================
+test('US45 · l\'administrateur voit les chiffres de toute la plateforme', async () => {
+  await en('admin', async () => {
+    const [{ s }] = await lignes(`select public.statistiques_plateforme(30) as s`);
+    // 7 commandes du jeu de test (1040 à 1046, sauf 1041 inexistante)
+    assert.equal(s.commandes, 6);
+    assert.equal(s.livrees, 2);
+    assert.equal(s.refusees, 1);
+    assert.equal(Number(s.chiffre_affaires), 49);          // 15,500 + 33,500
+    assert.equal(Number(s.ventes_restaurants), 44);        // 13 + 31
+    assert.equal(Number(s.frais_livraison), 5);
+    assert.equal(Number(s.commissions), 4.4);
+    assert.equal(Number(s.gains_livreurs), 4);
+    assert.equal(s.par_jour.length, 30);
+    assert.deepEqual(s.top_restaurants.map((r) => r.nom), ['Dar Zitouna', 'Brik Bab Souika']);
+    assert.ok(s.nouveaux_clients >= 3);
+    assert.equal(s.reclamations_ouvertes, 1);
+  });
+});
+
+test('US45 · statistiques globales refusées aux autres comptes', async () => {
+  for (const qui of ['amine', 'zitouna', 'sami']) {
+    await en(qui, async () => {
+      await assert.rejects(lignes(`select public.statistiques_plateforme(30)`), /réservée aux administrateurs/);
+    });
+  }
+});
+
+// =====================================================================
+// US49 — réclamations
+// =====================================================================
+const C_1042_R = '60000000-0000-4000-8000-000000001042';
+const signaler = (commande, motif = 'Plat manquant', description = null) =>
+  requete(`insert into public.reclamations (commande_id, client_id, motif, description) values ($1, auth.uid(), $2, $3) returning id, etat::text`,
+    [commande, motif, description]);
+const traiter = (id, resolue, reponse, montant = null) =>
+  requete(`select public.traiter_reclamation($1, $2, $3, $4)`, [id, resolue, reponse, montant]);
+
+test('US49 · le client signale un problème sur une commande livrée ; les champs de l\'admin sont ignorés', async () => {
+  await en('amine', async () => {
+    const r = await requete(`insert into public.reclamations (commande_id, client_id, motif, description, etat, reponse, montant_rembourse)
+      values ($1, auth.uid(), '  Plat froid ou abîmé ', '  Le couscous est arrivé froid. ', 'resolue', 'ok', 30) returning *`, [C_1042_R]);
+    const [x] = r.rows;
+    assert.equal(x.etat, 'ouverte');
+    assert.equal(x.motif, 'Plat froid ou abîmé');
+    assert.equal(x.description, 'Le couscous est arrivé froid.');
+    assert.equal(x.reponse, null);
+    assert.equal(x.montant_rembourse, null);
+  });
+});
+
+test('US49 · refus : commande non livrée, déjà signalée, trop ancienne, d\'un autre client', async () => {
+  await en('amine', async () => {
+    await assert.rejects(signaler(C_1046), /une fois la commande livrée/);          // en livraison
+    await assert.rejects(signaler(C_1040), /déjà en cours/);                       // réclamation du jeu de test
+    await assert.rejects(signaler(C_1042_R, ' '), /reclamations_motif_longueur/);
+  });
+  await en('amine', async () => {
+    await assert.rejects(signaler(C_1042_R), /délai de 7 jours/);
+  }, `update public.commandes set livree_le = now() - interval '8 days' where id = '${C_1042_R}'`);
+  await en('leila', async () => {
+    await assert.rejects(signaler(C_1042_R), /Commande introuvable/);
+  });
+});
+
+test('US49 · l\'admin résout avec un remboursement ; le client est prévenu', async () => {
+  await en('admin', async () => {
+    const [r] = await lignes(`select id from public.reclamations where commande_id = $1`, [C_1040]);
+    await assert.rejects(traiter(r.id, true, '  '), /Écrivez une réponse/);
+    await assert.rejects(traiter(r.id, true, 'Désolés', 20), /au total de la commande \(15,500 DT\)/);
+    await traiter(r.id, true, 'Désolés pour le fricassé manquant.', 2.5);
+    const [x] = await lignes(`select etat::text, reponse, montant_rembourse::text as montant, traitee_par is not null as par, traitee_le is not null as le
+      from public.reclamations where id = $1`, [r.id]);
+    assert.deepEqual(x, { etat: 'resolue', reponse: 'Désolés pour le fricassé manquant.', montant: '2.500', par: true, le: true });
+    await assert.rejects(traiter(r.id, false, 'Encore'), /déjà été traitée/);
+    await devenir('amine');
+    const [n] = await lignes(`select titre, message from public.notifications where type = 'reclamation'`);
+    assert.deepEqual(n, { titre: 'Réclamation résolue',
+      message: 'Commande n° 1040 : Désolés pour le fricassé manquant. Mida vous rembourse 2,500 DT.' });
+    // le client relit sa réclamation et la réponse
+    assert.equal((await lignes(`select etat::text from public.reclamations where commande_id = $1`, [C_1040]))[0].etat, 'resolue');
+  });
+});
+
+test('US49 · rejet sans remboursement ; traitement réservé à l\'admin', async () => {
+  await en('admin', async () => {
+    const [r] = await lignes(`select id from public.reclamations where commande_id = $1`, [C_1040]);
+    await traiter(r.id, false, 'Votre commande était complète d\'après le restaurant.', 10);
+    const [x] = await lignes(`select etat::text, montant_rembourse from public.reclamations where id = $1`, [r.id]);
+    assert.deepEqual(x, { etat: 'rejetee', montant_rembourse: null });
+  });
+  await en('amine', async () => {
+    const [r] = await lignes(`select id from public.reclamations where commande_id = $1`, [C_1040]);
+    await assert.rejects(traiter(r.id, true, 'Je me rembourse', 15), /réservée aux administrateurs/);
+    assert.equal(await nbModifiees(`update public.reclamations set etat = 'resolue'`), 0);
+  });
+});
+
+// =====================================================================
+// US47 — plusieurs adresses de livraison
+// =====================================================================
+test('US47 · le client enregistre plusieurs adresses, en choisit une par défaut ; les autres ne les voient pas', async () => {
+  await en('amine', async () => {
+    const avant = (await lignes(`select libelle from public.adresses order by libelle`)).map((a) => a.libelle);
+    assert.ok(avant.length >= 2);
+    await requete(`insert into public.adresses (client_id, libelle, rue, ville) values (auth.uid(), 'Chez mes parents', '3, rue de Marseille', 'Sousse')`);
+    // changer l'adresse par défaut : d'abord retirer l'ancienne
+    await requete(`update public.adresses set par_defaut = false where client_id = auth.uid() and par_defaut`);
+    await requete(`update public.adresses set par_defaut = true where libelle = 'Chez mes parents'`);
+    const defauts = await lignes(`select libelle from public.adresses where par_defaut`);
+    assert.deepEqual(defauts, [{ libelle: 'Chez mes parents' }]);
+    // deux adresses par défaut : refusé
+    await assert.rejects(requete(`update public.adresses set par_defaut = true`), /adresses_une_par_defaut/);
+    assert.equal(await nbModifiees(`delete from public.adresses where libelle = 'Chez mes parents'`), 1);
+  });
+  await en('leila', async () => {
+    assert.equal((await lignes(`select count(*)::int as n from public.adresses where client_id <> auth.uid()`))[0].n, 0);
+  });
+});

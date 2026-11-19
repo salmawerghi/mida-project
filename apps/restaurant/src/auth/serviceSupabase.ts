@@ -9,6 +9,7 @@ import {
 } from '../commandes/commandes'
 
 import { supabaseKey, supabaseUrl } from '../config'
+import { lireStats, type StatsRestaurant } from '../statistiques/statistiques'
 import {
   bornesDates,
   etatsDuFiltre,
@@ -25,7 +26,7 @@ import { completerHoraires, heureCourte, type Horaire } from '../profil/horaires
 import { reduireImage } from '../profil/image'
 import { messageErreur } from './erreurs'
 import { effacerBrouillon, sauverBrouillon } from './brouillon'
-import { ErreurMida, messageCompteExistant } from './erreurs'
+import { ErreurMida, messageCodeInvalide, messageCompteExistant } from './erreurs'
 import {
   messageRestaurantBloque,
   refusCompte,
@@ -125,6 +126,28 @@ export class ServiceRestaurantSupabase implements ServiceRestaurant {
     if (error) throw error
     // vérifie le rôle et l'état (lève ErreurMida et déconnecte si refusé)
     await this.compteActuel()
+  }
+
+  async demanderReinitialisation(email: string): Promise<void> {
+    const { error } = await this.client.auth.resetPasswordForEmail(email.trim())
+    if (error) throw error
+  }
+
+  async verifierCodeReinitialisation(email: string, code: string): Promise<void> {
+    const { data, error } = await this.client.auth.verifyOtp({
+      type: 'recovery',
+      email: email.trim(),
+      token: code.replace(/\s/g, ''),
+    })
+    if (error) throw error
+    if (!data.session) throw new ErreurMida(messageCodeInvalide)
+    // un compte client ou livreur n'utilise pas l'espace restaurant (déconnecté par compteActuel)
+    await this.compteActuel()
+  }
+
+  async changerMotDePasse(motDePasse: string): Promise<void> {
+    const { error } = await this.client.auth.updateUser({ password: motDePasse })
+    if (error) throw error
   }
 
   async inscrire(responsable: InfosResponsable, restaurant: InfosRestaurant): Promise<ResultatInscription> {
@@ -478,6 +501,13 @@ export class ServiceRestaurantSupabase implements ServiceRestaurant {
       nbLivrees,
       chiffreAffaires: Math.round(chiffreAffaires * 1000) / 1000,
     }
+  }
+
+  async statistiques(restaurantId: string, jours: number): Promise<StatsRestaurant> {
+    // Fonction de la base (migration US44), calculée avec les droits du responsable.
+    const { data, error } = await this.client.rpc('statistiques_restaurant', { p_restaurant: restaurantId, p_jours: jours })
+    if (error) throw error
+    return lireStats((data ?? {}) as Record<string, unknown>)
   }
 
   async avisRestaurant(restaurantId: string): Promise<AvisClient[]> {

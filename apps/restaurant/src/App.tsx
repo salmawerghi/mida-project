@@ -13,6 +13,7 @@ import Connexion from './pages/Connexion'
 import Historique from './pages/Historique'
 import Inscription from './pages/Inscription'
 import Menu from './pages/Menu'
+import MotDePasseOublie from './pages/MotDePasseOublie'
 import PlatForm from './pages/PlatForm'
 import Profil from './pages/Profil'
 import Tableau from './pages/Tableau'
@@ -60,6 +61,7 @@ export function Routage({ lecteur }: { lecteur?: LecteurAlerte } = {}) {
         <Route path="/" element={<Accueil />} />
         <Route path="/connexion" element={<Connexion />} />
         <Route path="/inscription" element={<Inscription />} />
+        <Route path="/mot-de-passe-oublie" element={<MotDePasseOublie />} />
         <Route path="/attente" element={<PageProtegee page="/attente" rendu={(c) => <Attente compte={c} />} />} />
         <Route path="/tableau" element={<PageProtegee page="/tableau" rendu={(c) => <Tableau compte={c} />} />} />
         <Route path="/menu" element={<PageProtegee page="/menu" rendu={(c) => <Menu compte={c} />} />} />

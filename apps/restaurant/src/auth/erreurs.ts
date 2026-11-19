@@ -11,6 +11,7 @@ export class ErreurMida extends Error {
 export const messageIdentifiantsIncorrects = 'E-mail ou mot de passe incorrect.'
 export const messageHorsLigne = 'Pas de connexion internet. Vérifiez votre réseau puis réessayez.'
 export const messageCompteExistant = 'Un compte existe déjà avec cette adresse e-mail. Connectez-vous.'
+export const messageCodeInvalide = 'Code incorrect ou expiré. Vérifiez-le, ou demandez un nouveau code.'
 
 /** Traduit une erreur de Supabase (Auth, base) ou du réseau en message clair. */
 export function messageErreur(erreur: unknown): string {
@@ -36,6 +37,10 @@ export function messageErreur(erreur: unknown): string {
       return 'Trop de tentatives. Patientez quelques minutes puis réessayez.'
     }
     if (code === 'signup_disabled') return 'Les inscriptions sont momentanément fermées.'
+    if (code === 'otp_expired' || code === 'otp_disabled' || message.includes('token has expired or is invalid')) {
+      return messageCodeInvalide
+    }
+    if (code === 'same_password') return "Choisissez un mot de passe différent de l'ancien."
   }
 
   // Erreurs du stockage des images : { statusCode, message }

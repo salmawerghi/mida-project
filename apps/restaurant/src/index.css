@@ -1605,3 +1605,131 @@ textarea.saisie {
   margin: 8px 0 0;
   color: var(--nuit);
 }
+
+/* ------------------------------------------------------------------ */
+/* Tableau de bord : statistiques (US44)                              */
+/* ------------------------------------------------------------------ */
+.stats-periodes {
+  display: flex;
+  gap: 8px;
+}
+.stats-tuiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.stats-tuile {
+  padding: 16px;
+}
+.stats-valeur {
+  font-family: var(--titre);
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--nuit);
+  margin: 2px 0;
+}
+.stats-detail {
+  font-size: 13px;
+}
+.stats-colonnes {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+@media (max-width: 900px) {
+  .stats-colonnes {
+    grid-template-columns: 1fr;
+  }
+}
+.stats-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.stats-table th,
+.stats-table td {
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--bordure);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.stats-table th:first-child {
+  text-align: left;
+  font-weight: 600;
+  color: var(--nuit);
+}
+.stats-table thead th {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--texte-doux);
+}
+
+/* Histogramme d'une seule série */
+.graphique {
+  margin: 0;
+}
+.graphique-titre {
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--nuit);
+}
+.graphique-zone {
+  position: relative;
+}
+.graphique-max {
+  font-size: 12px;
+  color: var(--texte-doux);
+  height: 16px;
+}
+.graphique-barres {
+  display: grid;
+  gap: 2px;
+  height: 180px;
+  align-items: end;
+  border-bottom: 1px solid var(--bordure);
+  background-image: linear-gradient(var(--bordure) 1px, transparent 1px);
+  background-size: 100% 50%;
+  background-position: 0 0;
+}
+.graphique-colonne {
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  cursor: default;
+}
+.graphique-barre {
+  width: min(100%, 22px);
+  background: var(--bleu);
+  border-radius: 4px 4px 0 0;
+}
+.graphique-colonne-active .graphique-barre {
+  background: var(--bleu-fonce);
+}
+.graphique-colonne-active {
+  background: rgba(21, 84, 192, 0.06);
+}
+.graphique-axe {
+  display: grid;
+  gap: 2px;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--texte-doux);
+  white-space: nowrap;
+}
+.graphique-bulle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  background: var(--nuit);
+  color: #fff;
+  border-radius: 10px;
+  font-size: 13px;
+  pointer-events: none;
+}

@@ -1,5 +1,7 @@
 import { vi } from 'vitest'
 
+import { ErreurMida, messageCodeInvalide } from '../auth/erreurs'
+
 import type {
   Compte,
   InfosResponsable,
@@ -14,6 +16,7 @@ import { etatsEnCours, type Commande, type EtatCommande, type EvenementCommande 
 import type { CategorieMenu } from '../menu/categories'
 import type { InfosPlat, Plat } from '../menu/plats'
 import { horairesParDefaut, type Horaire } from '../profil/horaires'
+import type { StatsRestaurant } from '../statistiques/statistiques'
 import {
   etatsDuFiltre,
   lireNumero,
@@ -48,6 +51,23 @@ export class FauxService implements ServiceRestaurant {
   })
 
   connecter = vi.fn(async () => {})
+
+  /** Mot de passe oublié (US06) : le bon code est « 123456 ». */
+  erreurReinitialisation: unknown = null
+  demanderReinitialisation = vi.fn(async (_email: string) => {
+    if (this.erreurReinitialisation) throw this.erreurReinitialisation
+  })
+  verifierCodeReinitialisation = vi.fn(async (_email: string, code: string) => {
+    if (code.replace(/\s/g, '') !== '123456') throw new ErreurMida(messageCodeInvalide)
+  })
+  erreurChangement: unknown = null
+  changerMotDePasse = vi.fn(async (_motDePasse: string) => {
+    if (this.erreurChangement) {
+      const e = this.erreurChangement
+      this.erreurChangement = null
+      throw e
+    }
+  })
   deconnecter = vi.fn(async () => {
     this.compte = null
     this.prevenir()
@@ -213,6 +233,14 @@ export class FauxService implements ServiceRestaurant {
     }
   })
 
+  /** Statistiques (US44) : par défaut, 7 jours avec quelques ventes. */
+  stats: StatsRestaurant = statsTest
+  erreurStats: unknown = null
+  statistiques = vi.fn(async (_restaurant: string, jours: number): Promise<StatsRestaurant> => {
+    if (this.erreurStats) throw this.erreurStats
+    return { ...this.stats, jours }
+  })
+
   /** Avis des clients (US48). */
   avis: AvisClient[] = []
   avisRestaurant = vi.fn(async (_restaurant: string) => this.avis)
@@ -304,4 +332,28 @@ export class FauxService implements ServiceRestaurant {
   private restaurantDe(r: InfosRestaurant) {
     return { id: 'r1', nom: r.nom.trim(), ville: r.ville, etat: 'en_attente' as const, motif_rejet: null, ouvert: false }
   }
+}
+
+/** Statistiques de test : 3 jours, 2 commandes livrées. */
+export const statsTest: StatsRestaurant = {
+  jours: 30,
+  commandes: 5,
+  livrees: 2,
+  refusees: 1,
+  annulees: 1,
+  ventes: 44,
+  panierMoyen: 22,
+  commissionPct: 10,
+  commission: 4.4,
+  parJour: [
+    { jour: '2026-11-17', commandes: 2, ventes: 13 },
+    { jour: '2026-11-18', commandes: 0, ventes: 0 },
+    { jour: '2026-11-19', commandes: 3, ventes: 31 },
+  ],
+  topPlats: [
+    { nom: 'Couscous à l’agneau', quantite: 3, ventes: 54 },
+    { nom: 'Brik à l’œuf', quantite: 2, ventes: 8 },
+  ],
+  noteMoyenne: 4.5,
+  nbAvis: 2,
 }

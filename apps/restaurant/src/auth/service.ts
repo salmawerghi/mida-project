@@ -2,6 +2,7 @@
 
 import type { Commande, EvenementCommande } from '../commandes/commandes'
 import type { AvisClient, FiltresHistorique, PageHistorique } from '../historique/historique'
+import type { StatsRestaurant } from '../statistiques/statistiques'
 import type { CategorieMenu } from '../menu/categories'
 import type { InfosPlat, Plat } from '../menu/plats'
 import type { Horaire } from '../profil/horaires'
@@ -85,6 +86,12 @@ export interface ServiceRestaurant {
   creerRestaurant(restaurant: InfosRestaurant): Promise<void>
   categories(): Promise<Categorie[]>
   deconnecter(): Promise<void>
+  /** Mot de passe oublié (US06) : envoie un code à 6 chiffres par e-mail. */
+  demanderReinitialisation(email: string): Promise<void>
+  /** Vérifie le code reçu ; ouvre une session de récupération (comptes responsables seulement). */
+  verifierCodeReinitialisation(email: string, code: string): Promise<void>
+  /** Enregistre le nouveau mot de passe (session de récupération ouverte). */
+  changerMotDePasse(motDePasse: string): Promise<void>
 
   /** Ouvre ou ferme le restaurant aux commandes (réservé aux restaurants validés). */
   changerOuverture(restaurantId: string, ouvert: boolean): Promise<void>
@@ -134,6 +141,8 @@ export interface ServiceRestaurant {
   historiqueCommandes(restaurantId: string, filtres: FiltresHistorique, page: number): Promise<PageHistorique>
   /** Avis laissés par les clients sur le restaurant, les plus récents d'abord (US48). */
   avisRestaurant(restaurantId: string): Promise<AvisClient[]>
+  /** Statistiques de ventes sur les `jours` derniers jours (US44). */
+  statistiques(restaurantId: string, jours: number): Promise<StatsRestaurant>
 }
 
 export interface ResultatPlat {

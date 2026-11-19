@@ -6,6 +6,7 @@ import { messageErreur } from '../auth/erreurs'
 import { pageDuCompte } from '../auth/service'
 import { useSession } from '../auth/session'
 import { validerEmail, validerMotDePasseConnexion } from '../auth/validation'
+import { motDePasseOublieActif } from '../config'
 import { Bouton, Champ, Chargement, Logo, MessageErreur, MessageInfo, SaisieMotDePasse } from '../composants'
 
 /** Maquette « Restaurant · Connexion ». */
@@ -104,6 +105,11 @@ export default function Connexion() {
             <input type="checkbox" checked={resterConnecte} onChange={(e) => setResterConnecte(e.target.checked)} />
             Rester connecté
           </label>
+          {motDePasseOublieActif && (
+            <p style={{ margin: 0 }}>
+              <Link to="/mot-de-passe-oublie">Mot de passe oublié ?</Link>
+            </p>
+          )}
           {erreur && <MessageErreur>{erreur}</MessageErreur>}
           <Bouton type="submit" plein enCours={enCours}>
             Se connecter

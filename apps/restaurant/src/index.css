@@ -1419,3 +1419,189 @@ textarea.saisie {
   padding: 0;
   list-style: none;
 }
+
+/* ------------------------------------------------------------------ */
+/* Historique des commandes (US39)                                    */
+/* ------------------------------------------------------------------ */
+.historique-filtres {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px 16px;
+  align-items: end;
+  background: #fff;
+  border: 1px solid var(--bordure);
+  border-radius: 18px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+.historique-boutons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.historique-message {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.historique-resume {
+  margin: 0 0 12px;
+  color: var(--texte-moyen);
+}
+.historique-vide {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.historique-liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.historique-ligne {
+  background: #fff;
+  border: 1px solid var(--bordure);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.historique-entete {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 90px minmax(150px, 1fr) minmax(110px, 1fr) auto 110px;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 16px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: var(--nuit);
+  text-align: left;
+  cursor: pointer;
+}
+.historique-entete:hover {
+  background: var(--fond);
+}
+.historique-entete:focus-visible {
+  outline: 3px solid var(--bleu);
+  outline-offset: -3px;
+}
+.historique-numero {
+  font-weight: 700;
+}
+.historique-date,
+.historique-client {
+  color: var(--texte-doux);
+}
+.historique-total {
+  font-weight: 700;
+  text-align: right;
+}
+.historique-detail {
+  padding: 4px 16px 14px;
+  border-top: 1px solid var(--bordure);
+  color: var(--texte-moyen);
+}
+.historique-detail p {
+  margin: 8px 0 0;
+}
+.historique-pages {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 16px;
+}
+@media (max-width: 720px) {
+  .historique-entete {
+    grid-template-columns: 1fr auto;
+  }
+  .historique-date,
+  .historique-client {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Avis des clients (US48)                                            */
+/* ------------------------------------------------------------------ */
+.avis-resume {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px 40px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.avis-moyenne p {
+  margin: 4px 0 0;
+  color: var(--texte-doux);
+}
+.avis-note {
+  font-family: var(--titre);
+  font-size: 48px;
+  font-weight: 700;
+  color: var(--nuit);
+}
+.avis-sur {
+  margin-left: 4px;
+  color: var(--texte-doux);
+}
+.avis-repartition {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 1 1 260px;
+  display: grid;
+  gap: 6px;
+}
+.avis-repartition li {
+  display: grid;
+  grid-template-columns: 40px 1fr 32px;
+  gap: 10px;
+  align-items: center;
+  color: var(--texte-moyen);
+}
+.avis-barre {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--fond);
+  overflow: hidden;
+}
+.avis-barre span {
+  display: block;
+  height: 100%;
+  background: var(--dore);
+}
+.avis-filtres {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.avis-liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.avis-entete {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: baseline;
+}
+.avis-etoiles {
+  color: #9a6a00;
+  font-size: 18px;
+  letter-spacing: 1px;
+}
+.avis-commentaire {
+  margin: 8px 0 0;
+  color: var(--nuit);
+}

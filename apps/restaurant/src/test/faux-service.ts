@@ -14,6 +14,15 @@ import { etatsEnCours, type Commande, type EtatCommande, type EvenementCommande 
 import type { CategorieMenu } from '../menu/categories'
 import type { InfosPlat, Plat } from '../menu/plats'
 import { horairesParDefaut, type Horaire } from '../profil/horaires'
+import {
+  etatsDuFiltre,
+  lireNumero,
+  parPage,
+  type AvisClient,
+  type CommandeHistorique,
+  type FiltresHistorique,
+  type PageHistorique,
+} from '../historique/historique'
 
 /** Faux service : garde le compte en mémoire et enregistre les appels. */
 export class FauxService implements ServiceRestaurant {
@@ -183,6 +192,30 @@ export class FauxService implements ServiceRestaurant {
     this.commandes = this.commandes.map((c) => (c.id === id ? { ...c, etat } : c))
     for (const a of this.abonnes) a.rappel({ type: 'UPDATE', id, etat })
   }
+
+  /** Historique (US39) : commandes passées, de la plus récente à la plus ancienne. */
+  historique: CommandeHistorique[] = []
+  erreurHistorique: unknown = null
+
+  historiqueCommandes = vi.fn(async (_restaurant: string, filtres: FiltresHistorique, page: number): Promise<PageHistorique> => {
+    if (this.erreurHistorique) throw this.erreurHistorique
+    const etats = etatsDuFiltre(filtres.etat)
+    const numero = lireNumero(filtres.numero)
+    const choisies = this.historique.filter(
+      (c) => (!etats || etats.includes(c.etat)) && (numero === null || c.numero === numero),
+    )
+    const livrees = choisies.filter((c) => c.etat === 'livree')
+    return {
+      commandes: choisies.slice(page * parPage, (page + 1) * parPage),
+      total: choisies.length,
+      nbLivrees: livrees.length,
+      chiffreAffaires: livrees.reduce((s, c) => s + c.total, 0),
+    }
+  })
+
+  /** Avis des clients (US48). */
+  avis: AvisClient[] = []
+  avisRestaurant = vi.fn(async (_restaurant: string) => this.avis)
 
   erreurDecision: unknown = null
 

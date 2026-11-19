@@ -9,8 +9,8 @@ import { Logo } from './composants'
 
 /**
  * Cadre des pages de l'espace restaurant (maquettes « Restaurant · … ») :
- * menu latéral bleu et contenu à droite. Les autres rubriques (historique,
- * statistiques) s'ajouteront avec leurs stories.
+ * menu latéral bleu et contenu à droite. Historique (US39) et avis (US48)
+ * sont réservés, comme les commandes, aux restaurants validés.
  */
 export default function Cadre({ compte, children }: { compte: Compte; children: ReactNode }) {
   const { service } = useSession()
@@ -45,6 +45,16 @@ export default function Cadre({ compte, children }: { compte: Compte; children: 
                 </span>
               )}
             </NavLink>
+          )}
+          {suivi.actif && (
+            <>
+              <NavLink to="/historique" className={classeLien}>
+                Historique
+              </NavLink>
+              <NavLink to="/avis" className={classeLien}>
+                Avis des clients
+              </NavLink>
+            </>
           )}
           <NavLink to="/menu" className={classeLien}>
             Menu

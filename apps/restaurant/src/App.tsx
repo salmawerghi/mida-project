@@ -7,8 +7,10 @@ import type { LecteurAlerte } from './commandes/son'
 import { FournisseurCommandes } from './commandes/suivi'
 import { Chargement } from './composants'
 import Attente from './pages/Attente'
+import Avis from './pages/Avis'
 import Commandes from './pages/Commandes'
 import Connexion from './pages/Connexion'
+import Historique from './pages/Historique'
 import Inscription from './pages/Inscription'
 import Menu from './pages/Menu'
 import PlatForm from './pages/PlatForm'
@@ -24,7 +26,7 @@ export function PageProtegee({
   page,
   rendu,
 }: {
-  page: '/attente' | '/tableau' | '/profil' | '/menu' | '/commandes'
+  page: '/attente' | '/tableau' | '/profil' | '/menu' | '/commandes' | '/historique' | '/avis'
   rendu: (compte: Compte) => ReactElement
 }) {
   const { etat } = useSession()
@@ -33,11 +35,11 @@ export function PageProtegee({
   if (etat.statut === 'deconnecte') return <Navigate to="/connexion" replace state={{ depuis: location.pathname }} />
   const attendue = pageDuCompte(etat.compte)
   // Profil et menu sont ouverts dès que le restaurant est inscrit, même avant sa validation (US07, US09).
-  // Les commandes, seulement pour un restaurant validé (comme le tableau de bord).
+  // Les commandes, leur historique et les avis, seulement pour un restaurant validé (comme le tableau de bord).
   const autorisee =
     page === '/profil' || page === '/menu'
       ? etat.compte.restaurant !== null
-      : page === '/commandes'
+      : page === '/commandes' || page === '/historique' || page === '/avis'
         ? attendue === '/tableau'
         : attendue === page
   if (!autorisee) return <Navigate to={attendue} replace />
@@ -65,6 +67,11 @@ export function Routage({ lecteur }: { lecteur?: LecteurAlerte } = {}) {
         <Route path="/menu/plats/:id" element={<PageProtegee page="/menu" rendu={(c) => <PlatForm compte={c} />} />} />
         <Route path="/profil" element={<PageProtegee page="/profil" rendu={(c) => <Profil compte={c} />} />} />
         <Route path="/commandes" element={<PageProtegee page="/commandes" rendu={(c) => <Commandes compte={c} />} />} />
+        <Route
+          path="/historique"
+          element={<PageProtegee page="/historique" rendu={(c) => <Historique compte={c} />} />}
+        />
+        <Route path="/avis" element={<PageProtegee page="/avis" rendu={(c) => <Avis compte={c} />} />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </FournisseurCommandes>

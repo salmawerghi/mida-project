@@ -9,6 +9,16 @@ import {
 } from '../commandes/commandes'
 
 import { supabaseKey, supabaseUrl } from '../config'
+import {
+  bornesDates,
+  etatsDuFiltre,
+  lireNumero,
+  parPage,
+  type AvisClient,
+  type CommandeHistorique,
+  type FiltresHistorique,
+  type PageHistorique,
+} from '../historique/historique'
 import { messageCategorieExistante, type CategorieMenu } from '../menu/categories'
 import type { InfosPlat, Plat } from '../menu/plats'
 import { completerHoraires, heureCourte, type Horaire } from '../profil/horaires'
@@ -429,6 +439,81 @@ export class ServiceRestaurantSupabase implements ServiceRestaurant {
     const { error } = await this.client.rpc('avancer_commande', { p_commande: commandeId, p_etat: etat })
     if (error) throw error
   }
+
+  async historiqueCommandes(restaurantId: string, filtres: FiltresHistorique, page: number): Promise<PageHistorique> {
+    // Lecture seule : la règle d'accès d'US02 ne montre que les commandes de ce restaurant.
+    const debut = page * parPage
+    const f = planFiltres(filtres)
+    let requete = this.client
+      .from('commandes')
+      .select(
+        'id, numero, etat, total, remarque, motif_refus, created_at, acceptee_le, prete_le, livree_le, annulee_le, ' +
+          'client:profiles!commandes_client_id_fkey(nom), lignes_commande(nom_plat, quantite, remarque), paiements(mode, etat)',
+        { count: 'exact' },
+      )
+      .eq('restaurant_id', restaurantId)
+    if (f.etats) requete = requete.in('etat', f.etats)
+    if (f.depuis) requete = requete.gte('created_at', f.depuis)
+    if (f.avant) requete = requete.lt('created_at', f.avant)
+    if (f.numero !== null) requete = requete.eq('numero', f.numero)
+    const { data, error, count } = await requete.order('created_at', { ascending: false }).range(debut, debut + parPage - 1)
+    if (error) throw error
+
+    // Chiffre d'affaires : commandes livrées parmi celles du filtre (toutes les pages).
+    let chiffreAffaires = 0
+    let nbLivrees = 0
+    if (filtres.etat === 'toutes' || filtres.etat === 'livree') {
+      let somme = this.client.from('commandes').select('total').eq('restaurant_id', restaurantId).eq('etat', 'livree')
+      if (f.depuis) somme = somme.gte('created_at', f.depuis)
+      if (f.avant) somme = somme.lt('created_at', f.avant)
+      if (f.numero !== null) somme = somme.eq('numero', f.numero)
+      const ca = await somme.limit(10000)
+      if (ca.error) throw ca.error
+      for (const l of ca.data ?? []) chiffreAffaires += Number(l.total)
+      nbLivrees = ca.data?.length ?? 0
+    }
+    return {
+      commandes: ((data ?? []) as unknown as LigneHistoriqueBD[]).map(versCommandeHistorique),
+      total: count ?? 0,
+      nbLivrees,
+      chiffreAffaires: Math.round(chiffreAffaires * 1000) / 1000,
+    }
+  }
+
+  async avisRestaurant(restaurantId: string): Promise<AvisClient[]> {
+    // Les avis sont publics (US02) ; le nom du client est lisible car c'est un client du restaurant.
+    const { data, error } = await this.client
+      .from('avis')
+      .select('id, note, commentaire, created_at, commandes(numero), client:profiles!avis_client_id_fkey(nom)')
+      .eq('restaurant_id', restaurantId)
+      .order('created_at', { ascending: false })
+      .limit(500)
+    if (error) throw error
+    return ((data ?? []) as unknown as LigneAvisBD[]).map((l) => {
+      const commande = premier(l.commandes)
+      return {
+        id: l.id,
+        note: l.note,
+        commentaire: l.commentaire,
+        creeLe: new Date(l.created_at),
+        numero: commande ? Number(commande.numero) : null,
+        client: nomCourt(premier(l.client)?.nom ?? ''),
+      }
+    })
+  }
+}
+
+/** Filtres de l'historique, communs à la page de commandes et au chiffre d'affaires. */
+function planFiltres(filtres: FiltresHistorique) {
+  const { depuis, avant } = bornesDates(filtres.du, filtres.au)
+  const numero = lireNumero(filtres.numero)
+  return {
+    etats: etatsDuFiltre(filtres.etat),
+    depuis,
+    avant,
+    // un numéro mal saisi ne correspond à aucune commande
+    numero: numero === null ? null : Number.isNaN(numero) ? -1 : numero,
+  }
 }
 
 interface LigneCommandeBD {
@@ -444,6 +529,30 @@ interface LigneCommandeBD {
   lignes_commande: { nom_plat: string; quantite: number; remarque: string | null }[] | null
   // paiements.commande_id est unique : PostgREST renvoie un objet (un tableau par prudence)
   paiements: NonNullable<Commande['paiement']> | NonNullable<Commande['paiement']>[] | null
+}
+
+interface LigneHistoriqueBD extends LigneCommandeBD {
+  motif_refus: string | null
+  livree_le: string | null
+  annulee_le: string | null
+}
+
+function versCommandeHistorique(l: LigneHistoriqueBD): CommandeHistorique {
+  return {
+    ...versCommande(l),
+    motifRefus: l.motif_refus,
+    livreeLe: l.livree_le ? new Date(l.livree_le) : null,
+    annuleeLe: l.annulee_le ? new Date(l.annulee_le) : null,
+  }
+}
+
+interface LigneAvisBD {
+  id: string
+  note: number
+  commentaire: string | null
+  created_at: string
+  commandes: { numero: number | string } | { numero: number | string }[] | null
+  client: { nom: string } | { nom: string }[] | null
 }
 
 function premier<T>(valeur: T | T[] | null): T | null {

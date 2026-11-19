@@ -1,6 +1,7 @@
 /** Opérations de compte utilisées par les écrans (remplaçables dans les tests). */
 
 import type { Commande, EvenementCommande } from '../commandes/commandes'
+import type { AvisClient, FiltresHistorique, PageHistorique } from '../historique/historique'
 import type { CategorieMenu } from '../menu/categories'
 import type { InfosPlat, Plat } from '../menu/plats'
 import type { Horaire } from '../profil/horaires'
@@ -128,6 +129,11 @@ export interface ServiceRestaurant {
   refuserCommande(commandeId: string, motif: string): Promise<void>
   /** Fait avancer une commande d'une étape : acceptée → en préparation → prête (US14). */
   avancerCommande(commandeId: string, etat: 'en_preparation' | 'prete'): Promise<void>
+
+  /** Historique des commandes, filtré, de la plus récente à la plus ancienne, par pages (US39). */
+  historiqueCommandes(restaurantId: string, filtres: FiltresHistorique, page: number): Promise<PageHistorique>
+  /** Avis laissés par les clients sur le restaurant, les plus récents d'abord (US48). */
+  avisRestaurant(restaurantId: string): Promise<AvisClient[]>
 }
 
 export interface ResultatPlat {

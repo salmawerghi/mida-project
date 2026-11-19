@@ -148,6 +148,19 @@ class FauxServiceLivreur implements ServiceLivreur {
     return () => _abonnes.remove(rappel);
   }
 
+  /// Courses déjà livrées (US42) et note des clients.
+  List<Course> livrees = [];
+  NoteLivreur note = const NoteLivreur();
+
+  @override
+  Future<List<Course>> mesCourses() async {
+    await _action('mesCourses');
+    return livrees;
+  }
+
+  @override
+  Future<NoteLivreur> maNote() async => note;
+
   /// Simule un changement venu de la base (temps réel).
   void simulerChangement(Course c) {
     courses[c.id] = c;
@@ -196,7 +209,7 @@ const courseEspeces = Course(
   ],
 );
 
-Course copie(Course c, {EtatCourse? etat, String? etatCommande}) => Course(
+Course copie(Course c, {EtatCourse? etat, String? etatCommande, DateTime? livreeLe}) => Course(
       id: c.id,
       etat: etat ?? c.etat,
       gain: c.gain,
@@ -213,6 +226,7 @@ Course copie(Course c, {EtatCourse? etat, String? etatCommande}) => Course(
       paiementEtat: c.paiementEtat,
       remarque: c.remarque,
       articles: c.articles,
+      livreeLe: livreeLe ?? c.livreeLe,
     );
 
 /// Photo factice choisie dans la galerie.

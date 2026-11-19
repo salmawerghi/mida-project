@@ -34,6 +34,12 @@ abstract class ServiceLivreur {
   /// Appelle [rappel] à chaque changement des courses ou des commandes
   /// (temps réel). Renvoie de quoi se désabonner.
   void Function() surChangements(void Function() rappel);
+
+  /// Courses livrées par le livreur connecté, de la plus récente à la plus ancienne (US42).
+  Future<List<Course>> mesCourses();
+
+  /// Note moyenne laissée par les clients (US38).
+  Future<NoteLivreur> maNote();
 }
 
 class ServiceLivreurSupabase implements ServiceLivreur {
@@ -149,5 +155,24 @@ class ServiceLivreurSupabase implements ServiceLivreur {
       if (statut == RealtimeSubscribeStatus.subscribed) rappel();
     });
     return () => _client.removeChannel(canal);
+  }
+
+  @override
+  Future<List<Course>> mesCourses() async {
+    final lignes = await _client
+        .from('livraisons')
+        .select(Course.colonnes)
+        .eq('livreur_id', _moi)
+        .eq('etat', 'livree')
+        .order('livree_le', ascending: false)
+        .limit(200);
+    return [for (final l in lignes) Course.depuis(l)];
+  }
+
+  @override
+  Future<NoteLivreur> maNote() async {
+    // Les avis sont publics (US02) ; seules les notes de ce livreur sont lues.
+    final lignes = await _client.from('avis').select('note').eq('livreur_id', _moi);
+    return NoteLivreur.depuis(lignes);
   }
 }

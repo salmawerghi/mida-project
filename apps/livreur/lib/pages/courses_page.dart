@@ -9,6 +9,7 @@ import '../donnees/modeles.dart';
 import '../theme.dart';
 import '../widgets/composants.dart';
 import 'course_page.dart';
+import 'gains_page.dart';
 
 /// Accueil du livreur validé (maquette « Livreur · Courses proposées ») :
 /// interrupteur « Disponible » (US26), course en cours, courses proposées (US27).
@@ -134,6 +135,11 @@ class _CoursesPageState extends State<CoursesPage> {
           ],
         ),
         actions: [
+          IconButton(
+            tooltip: 'Mes courses et gains',
+            icon: const Icon(Icons.account_balance_wallet_outlined, color: Couleurs.nuit),
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const GainsPage())),
+          ),
           IconButton(
             tooltip: 'Se déconnecter',
             icon: const Icon(Icons.logout_rounded, color: Couleurs.nuit),

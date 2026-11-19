@@ -220,3 +220,68 @@ class Course {
     );
   }
 }
+
+/// Gains du livreur (US42) : aujourd'hui, sur les 7 derniers jours et au total.
+class ResumeGains {
+  const ResumeGains({
+    required this.aujourdhui,
+    required this.nbAujourdhui,
+    required this.semaine,
+    required this.nbSemaine,
+    required this.total,
+    required this.nb,
+  });
+
+  final double aujourdhui;
+  final int nbAujourdhui;
+  final double semaine;
+  final int nbSemaine;
+  final double total;
+  final int nb;
+}
+
+/// Additionne les gains des courses livrées ; « 7 derniers jours » compte
+/// aujourd'hui et les 6 jours d'avant (dates locales).
+ResumeGains resumerGains(List<Course> courses, {DateTime? maintenant}) {
+  final m = (maintenant ?? DateTime.now()).toLocal();
+  final debutJour = DateTime(m.year, m.month, m.day);
+  final debutSemaine = debutJour.subtract(const Duration(days: 6));
+  var aujourdhui = 0.0, semaine = 0.0, total = 0.0;
+  var nbAujourdhui = 0, nbSemaine = 0, nb = 0;
+  for (final c in courses) {
+    if (c.etat != EtatCourse.livree) continue;
+    total += c.gain;
+    nb++;
+    final d = c.livreeLe?.toLocal();
+    if (d == null) continue;
+    if (!d.isBefore(debutSemaine)) {
+      semaine += c.gain;
+      nbSemaine++;
+    }
+    if (!d.isBefore(debutJour)) {
+      aujourdhui += c.gain;
+      nbAujourdhui++;
+    }
+  }
+  return ResumeGains(
+    aujourdhui: aujourdhui,
+    nbAujourdhui: nbAujourdhui,
+    semaine: semaine,
+    nbSemaine: nbSemaine,
+    total: total,
+    nb: nb,
+  );
+}
+
+/// Note moyenne donnée par les clients au livreur (US38, US42).
+class NoteLivreur {
+  const NoteLivreur({this.moyenne, this.nbAvis = 0});
+  final double? moyenne;
+  final int nbAvis;
+
+  factory NoteLivreur.depuis(List<dynamic> lignes) {
+    if (lignes.isEmpty) return const NoteLivreur();
+    final somme = lignes.fold<num>(0, (s, l) => s + (l['note'] as num));
+    return NoteLivreur(moyenne: somme / lignes.length, nbAvis: lignes.length);
+  }
+}

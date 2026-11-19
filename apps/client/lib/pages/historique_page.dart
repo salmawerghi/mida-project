@@ -157,7 +157,11 @@ class CarteCommande extends StatelessWidget {
                       style: const TextStyle(fontSize: 13, color: Couleurs.texteDoux),
                     ),
                     const SizedBox(height: 8),
-                    Pastille(libelle, couleur: fond, texte: texte),
+                    Wrap(spacing: 6, runSpacing: 4, children: [
+                      Pastille(libelle, couleur: fond, texte: texte),
+                      // US38 : une commande livrée pas encore notée
+                      if (c.aNoter) const Pastille('À noter ★', couleur: Couleurs.doreClair, texte: Color(0xFF6B4A00)),
+                    ]),
                   ],
                 ),
               ),

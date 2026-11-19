@@ -214,6 +214,9 @@ class CommandeClient {
     this.lignes = const [],
     this.paiementMode = 'especes',
     this.paiementEtat = 'en_attente',
+    this.livreurNom,
+    this.noteRestaurant,
+    this.noteLivreur,
   });
 
   final String id;
@@ -235,6 +238,16 @@ class CommandeClient {
   final String paiementMode;
   final String paiementEtat;
 
+  /// Prénom et nom du livreur de la commande (`null` sans livreur).
+  final String? livreurNom;
+
+  /// Notes déjà données par le client (US38), `null` tant qu'il n'a pas noté.
+  final int? noteRestaurant;
+  final int? noteLivreur;
+
+  /// Une commande livrée et pas encore notée : le client peut donner son avis (US38).
+  bool get aNoter => etat == EtatCommande.livree && noteRestaurant == null;
+
   bool get rembourse => paiementMode == 'carte' && paiementEtat == 'rembourse';
 
   /// Nombre de plats commandés (quantités additionnées) : « 3 articles ».
@@ -243,13 +256,23 @@ class CommandeClient {
   /// Colonnes lues par l'appli (avec le nom du restaurant, les lignes et le paiement).
   static const colonnes = 'id, numero, etat, adresse_livraison, sous_total, frais_livraison, total, remarque, '
       'motif_refus, created_at, acceptee_le, prete_le, livree_le, annulee_le, '
-      'restaurants(nom), lignes_commande(nom_plat, quantite, prix_unitaire), paiements(mode, etat)';
+      'restaurants(nom), lignes_commande(nom_plat, quantite, prix_unitaire), paiements(mode, etat), '
+      'livraisons(livreurs(profiles(nom))), avis(note, livreur_id)';
 
   factory CommandeClient.depuis(Map<String, dynamic> l) {
     DateTime? date(Object? v) => v == null ? null : DateTime.parse(v as String);
     Object? premier(Object? v) => v is List ? (v.isEmpty ? null : v.first) : v;
     final restaurant = premier(l['restaurants']) as Map?;
     final paiement = premier(l['paiements']) as Map?;
+    final livraison = premier(l['livraisons']) as Map?;
+    final livreur = premier(livraison?['livreurs']) as Map?;
+    final profil = premier(livreur?['profiles']) as Map?;
+    int? note({required bool livreur}) {
+      for (final a in (l['avis'] as List? ?? const [])) {
+        if ((a['livreur_id'] != null) == livreur) return (a['note'] as num).toInt();
+      }
+      return null;
+    }
     return CommandeClient(
       id: l['id'] as String,
       numero: (l['numero'] as num).toInt(),
@@ -276,6 +299,9 @@ class CommandeClient {
       ],
       paiementMode: paiement?['mode'] as String? ?? 'especes',
       paiementEtat: paiement?['etat'] as String? ?? 'en_attente',
+      livreurNom: profil?['nom'] as String?,
+      noteRestaurant: note(livreur: false),
+      noteLivreur: note(livreur: true),
     );
   }
 }

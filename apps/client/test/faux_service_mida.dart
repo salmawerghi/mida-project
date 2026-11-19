@@ -99,6 +99,38 @@ class FauxServiceMida implements ServiceMida {
     simulerChangement(avecEtat(suivies[id]!, EtatCommande.annulee, annuleeLe: DateTime(2026, 11, 16, 19, 3)));
   }
 
+  /// Avis envoyés (US38) ; `erreurAvis` est levée à la place si elle est fournie.
+  final avis = <Map<String, Object?>>[];
+  Object? erreurAvis;
+
+  @override
+  Future<void> noterCommande(
+    String id, {
+    required int noteRestaurant,
+    String? commentaireRestaurant,
+    int? noteLivreur,
+    String? commentaireLivreur,
+  }) async {
+    if (erreurAvis != null) throw erreurAvis!;
+    avis.add({
+      'commande': id,
+      'restaurant': noteRestaurant,
+      'commentaireRestaurant': commentaireRestaurant,
+      'livreur': noteLivreur,
+      'commentaireLivreur': commentaireLivreur,
+    });
+    final c = suivies[id]!;
+    suivies[id] = avecEtat(c, c.etat,
+        accepteeLe: c.accepteeLe,
+        preteLe: c.preteLe,
+        livreeLe: c.livreeLe,
+        paiementMode: c.paiementMode,
+        paiementEtat: c.paiementEtat,
+        livreurNom: c.livreurNom,
+        noteRestaurant: noteRestaurant,
+        noteLivreur: noteLivreur);
+  }
+
   /// Simule un changement fait par le restaurant (événement temps réel).
   void simulerChangement(CommandeClient c) {
     suivies[c.id] = c;
@@ -161,6 +193,10 @@ CommandeClient avecEtat(
   String? motifRefus,
   String paiementMode = 'especes',
   String paiementEtat = 'en_attente',
+  DateTime? livreeLe,
+  String? livreurNom,
+  int? noteRestaurant,
+  int? noteLivreur,
 }) =>
     CommandeClient(
       id: c.id,
@@ -180,6 +216,10 @@ CommandeClient avecEtat(
       lignes: c.lignes,
       paiementMode: paiementMode,
       paiementEtat: paiementEtat,
+      livreeLe: livreeLe,
+      livreurNom: livreurNom,
+      noteRestaurant: noteRestaurant,
+      noteLivreur: noteLivreur,
     );
 
 const categoriesTest = [

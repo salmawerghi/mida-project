@@ -41,6 +41,16 @@ abstract class ServiceMida {
 
   /// Annule la commande tant que le restaurant ne l'a pas acceptée (US21).
   Future<void> annulerCommande(String id);
+
+  /// Avis sur une commande livrée (US38) : note du restaurant (obligatoire),
+  /// note du livreur (facultative), commentaires facultatifs. Une seule fois.
+  Future<void> noterCommande(
+    String id, {
+    required int noteRestaurant,
+    String? commentaireRestaurant,
+    int? noteLivreur,
+    String? commentaireLivreur,
+  });
 }
 
 class ServiceMidaSupabase implements ServiceMida {
@@ -174,5 +184,23 @@ class ServiceMidaSupabase implements ServiceMida {
   Future<void> annulerCommande(String id) async {
     // Fonction de la base (migration US21) : seulement le client, seulement « en attente ».
     await _client.rpc('annuler_commande', params: {'p_commande': id});
+  }
+
+  @override
+  Future<void> noterCommande(
+    String id, {
+    required int noteRestaurant,
+    String? commentaireRestaurant,
+    int? noteLivreur,
+    String? commentaireLivreur,
+  }) async {
+    // Fonction de la base (migration US38) : vérifie que la commande est livrée et pas encore notée.
+    await _client.rpc('noter_commande', params: {
+      'p_commande': id,
+      'p_note_restaurant': noteRestaurant,
+      'p_commentaire_restaurant': commentaireRestaurant,
+      'p_note_livreur': noteLivreur,
+      'p_commentaire_livreur': commentaireLivreur,
+    });
   }
 }

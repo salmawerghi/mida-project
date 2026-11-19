@@ -9,6 +9,7 @@ import '../donnees/modeles.dart';
 import '../theme.dart';
 import '../widgets/catalogue.dart';
 import '../widgets/composants.dart';
+import 'noter_page.dart';
 
 /// Suivi d'une commande en temps réel (maquettes « Client · Suivi » et
 /// « Client · Commande refusée », US20) : l'état change sans action du client.
@@ -99,6 +100,16 @@ class _SuiviPageState extends State<SuiviPage> {
     }
   }
 
+  /// Avis après la livraison (US38).
+  Future<void> _noter(CommandeClient c) async {
+    final note = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => NoterPage(commande: c)),
+    );
+    if (note != true || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Merci pour votre avis !')));
+    await _charger();
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = _commande;
@@ -142,6 +153,10 @@ class _SuiviPageState extends State<SuiviPage> {
                     _Annulation(commande: c)
                   else
                     _Etapes(commande: c),
+                  if (c.etat == EtatCommande.livree) ...[
+                    const SizedBox(height: 16),
+                    _Avis(commande: c, surNoter: () => _noter(c)),
+                  ],
                   if (_erreur != null) ...[const SizedBox(height: 12), MessageErreur(_erreur!)],
                   if (c.etat == EtatCommande.enAttente) ...[
                     const SizedBox(height: 16),
@@ -227,6 +242,59 @@ class _Etapes extends StatelessWidget {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// Avis du client (US38) : invitation à noter, ou rappel des notes données.
+class _Avis extends StatelessWidget {
+  const _Avis({required this.commande, required this.surNoter});
+  final CommandeClient commande;
+  final VoidCallback surNoter;
+
+  static String _etoiles(int n) => '${'★' * n}${'☆' * (5 - n)}';
+
+  @override
+  Widget build(BuildContext context) {
+    final c = commande;
+    if (c.aNoter) {
+      return _Carte(
+        couleur: const Color(0xFFFFF6DE),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text('Bon appétit !', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: Couleurs.nuit)),
+            const SizedBox(height: 4),
+            Text(
+              'Donnez votre avis sur ${c.restaurantNom}${c.livreurNom == null ? '' : ' et votre livreur'} : '
+              'il aide les autres clients.',
+              style: const TextStyle(color: Couleurs.texteDoux),
+            ),
+            const SizedBox(height: 12),
+            BoutonRelief(libelle: 'Noter la commande', onPressed: surNoter),
+          ],
+        ),
+      );
+    }
+    final noteResto = c.noteRestaurant!;
+    final noteLivreur = c.noteLivreur;
+    return _Carte(
+      child: Semantics(
+        container: true,
+        label: 'Votre avis : $noteResto sur 5 pour ${c.restaurantNom}'
+            '${noteLivreur == null ? '' : ', $noteLivreur sur 5 pour le livreur'}',
+        excludeSemantics: true,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Merci pour votre avis', style: TextStyle(fontWeight: FontWeight.w700, color: Couleurs.nuit)),
+            const SizedBox(height: 4),
+            Text('${_etoiles(noteResto)}  ${c.restaurantNom}', style: const TextStyle(color: Couleurs.texteDoux)),
+            if (noteLivreur != null)
+              Text('${_etoiles(noteLivreur)}  Livreur', style: const TextStyle(color: Couleurs.texteDoux)),
+          ],
+        ),
       ),
     );
   }

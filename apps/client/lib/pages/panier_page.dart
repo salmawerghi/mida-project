@@ -172,13 +172,6 @@ class _PanierPageState extends State<PanierPage> {
                         icone: Icons.payments_outlined,
                         choisi: true,
                       ),
-                      const SizedBox(height: 8),
-                      const _ModePaiement(
-                        titre: 'Carte en ligne',
-                        detail: 'Bientôt disponible',
-                        icone: Icons.credit_card_outlined,
-                        choisi: false,
-                      ),
                       const SizedBox(height: 18),
                       _Montant('Sous-total', panier.sousTotal),
                       _Montant('Frais de livraison', frais),

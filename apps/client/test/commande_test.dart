@@ -63,7 +63,8 @@ void main() {
       expect(find.text('2,500 DT'), findsWidgets); // frais
       expect(find.text('25,500 DT'), findsOneWidget); // total
       expect(find.bySemanticsLabel('Espèces, À payer au livreur, à la livraison'), findsOneWidget);
-      expect(find.bySemanticsLabel('Carte en ligne, Bientôt disponible'), findsOneWidget);
+      // paiement par carte abandonné (US30-US31 annulées) : espèces seulement
+      expect(find.textContaining('Carte'), findsNothing);
     });
 
     testWidgets('adresse obligatoire, puis commande envoyée : panier vidé', (tester) async {

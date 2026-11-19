@@ -10,6 +10,7 @@ import '../theme.dart';
 import '../widgets/catalogue.dart';
 import '../widgets/composants.dart';
 import 'noter_page.dart';
+import 'signaler_page.dart';
 
 /// Suivi d'une commande en temps réel (maquettes « Client · Suivi » et
 /// « Client · Commande refusée », US20) : l'état change sans action du client.
@@ -110,6 +111,18 @@ class _SuiviPageState extends State<SuiviPage> {
     await _charger();
   }
 
+  /// Réclamation après la livraison (US49).
+  Future<void> _signaler(CommandeClient c) async {
+    final envoye = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => SignalerPage(commande: c)),
+    );
+    if (envoye != true || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Problème signalé : Mida vous répondra par une notification.')),
+    );
+    await _charger();
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = _commande;
@@ -156,6 +169,17 @@ class _SuiviPageState extends State<SuiviPage> {
                   if (c.etat == EtatCommande.livree) ...[
                     const SizedBox(height: 16),
                     _Avis(commande: c, surNoter: () => _noter(c)),
+                    if (c.reclamation != null) ...[
+                      const SizedBox(height: 12),
+                      _Reclamation(reclamation: c.reclamation!),
+                    ],
+                    if (c.peutSignaler(DateTime.now()))
+                      TextButton.icon(
+                        onPressed: () => _signaler(c),
+                        icon: const Icon(Icons.report_problem_outlined),
+                        label: const Text('Signaler un problème'),
+                        style: TextButton.styleFrom(foregroundColor: Couleurs.harissaFonce),
+                      ),
                   ],
                   if (_erreur != null) ...[const SizedBox(height: 12), MessageErreur(_erreur!)],
                   if (c.etat == EtatCommande.enAttente) ...[
@@ -295,6 +319,41 @@ class _Avis extends StatelessWidget {
               Text('${_etoiles(noteLivreur)}  Livreur', style: const TextStyle(color: Couleurs.texteDoux)),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Réclamation du client et réponse de Mida (US49).
+class _Reclamation extends StatelessWidget {
+  const _Reclamation({required this.reclamation});
+  final ReclamationClient reclamation;
+
+  @override
+  Widget build(BuildContext context) {
+    final r = reclamation;
+    final titre = switch (r.etat) {
+      'resolue' => 'Réclamation résolue',
+      'rejetee' => 'Réclamation examinée',
+      _ => 'Réclamation envoyée : Mida l\'étudie',
+    };
+    final montant = r.montantRembourse;
+    return _Carte(
+      couleur: r.enCours ? const Color(0xFFFFF6DE) : Colors.white,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(titre, style: const TextStyle(fontWeight: FontWeight.w700, color: Couleurs.nuit)),
+          Text('Motif : ${r.motif}', style: const TextStyle(color: Couleurs.texteDoux)),
+          if (r.reponse != null) ...[
+            const SizedBox(height: 6),
+            Text('Réponse de Mida : ${r.reponse}'),
+          ],
+          if (montant != null) ...[
+            const SizedBox(height: 4),
+            Text('Remboursement : ${formaterPrix(montant)}', style: const TextStyle(fontWeight: FontWeight.w700)),
+          ],
+        ],
       ),
     );
   }

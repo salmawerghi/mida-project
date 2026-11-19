@@ -217,6 +217,7 @@ class CommandeClient {
     this.livreurNom,
     this.noteRestaurant,
     this.noteLivreur,
+    this.reclamation,
   });
 
   final String id;
@@ -245,6 +246,18 @@ class CommandeClient {
   final int? noteRestaurant;
   final int? noteLivreur;
 
+  /// Dernière réclamation du client sur cette commande (US49), s'il y en a une.
+  final ReclamationClient? reclamation;
+
+  /// « Signaler un problème » (US49) : commande livrée depuis moins de 7 jours,
+  /// sans réclamation en cours.
+  bool peutSignaler(DateTime maintenant) {
+    final livree = livreeLe;
+    if (etat != EtatCommande.livree || livree == null) return false;
+    if (reclamation?.enCours ?? false) return false;
+    return maintenant.difference(livree) < const Duration(days: 7);
+  }
+
   /// Une commande livrée et pas encore notée : le client peut donner son avis (US38).
   bool get aNoter => etat == EtatCommande.livree && noteRestaurant == null;
 
@@ -257,7 +270,8 @@ class CommandeClient {
   static const colonnes = 'id, numero, etat, adresse_livraison, sous_total, frais_livraison, total, remarque, '
       'motif_refus, created_at, acceptee_le, prete_le, livree_le, annulee_le, '
       'restaurants(nom), lignes_commande(nom_plat, quantite, prix_unitaire), paiements(mode, etat), '
-      'livraisons(livreurs(profiles(nom))), avis(note, livreur_id)';
+      'livraisons(livreurs(profiles(nom))), avis(note, livreur_id), '
+      'reclamations(motif, etat, reponse, montant_rembourse, created_at)';
 
   factory CommandeClient.depuis(Map<String, dynamic> l) {
     DateTime? date(Object? v) => v == null ? null : DateTime.parse(v as String);
@@ -302,6 +316,7 @@ class CommandeClient {
       livreurNom: profil?['nom'] as String?,
       noteRestaurant: note(livreur: false),
       noteLivreur: note(livreur: true),
+      reclamation: ReclamationClient.derniere(l['reclamations']),
     );
   }
 }
@@ -372,3 +387,88 @@ int comparerRestaurants(RestaurantCatalogue a, RestaurantCatalogue b) {
   if (note != 0) return note;
   return a.nom.toLowerCase().compareTo(b.nom.toLowerCase());
 }
+
+/// Adresse de livraison enregistrée par le client (US47).
+class AdresseClient {
+  const AdresseClient({
+    required this.id,
+    required this.libelle,
+    required this.rue,
+    required this.ville,
+    this.complement,
+    this.parDefaut = false,
+  });
+
+  final String id;
+  final String libelle;
+  final String rue;
+  final String ville;
+  final String? complement;
+  final bool parDefaut;
+
+  /// Texte copié dans la commande : « 12, rue du Jasmin, 2e étage, La Marsa ».
+  String get texte => [rue, if (complement != null && complement!.isNotEmpty) complement!, ville].join(', ');
+
+  static const colonnes = 'id, libelle, rue, ville, complement, par_defaut';
+
+  factory AdresseClient.depuis(Map<String, dynamic> l) => AdresseClient(
+        id: l['id'] as String,
+        libelle: l['libelle'] as String,
+        rue: l['rue'] as String,
+        ville: l['ville'] as String,
+        complement: l['complement'] as String?,
+        parDefaut: l['par_defaut'] as bool? ?? false,
+      );
+}
+
+/// L'adresse par défaut d'abord, puis par libellé.
+List<AdresseClient> trierAdresses(List<AdresseClient> adresses) => [...adresses]
+  ..sort((a, b) => a.parDefaut != b.parDefaut ? (a.parDefaut ? -1 : 1) : a.libelle.compareTo(b.libelle));
+
+/// Réclamation du client sur une commande (US49).
+class ReclamationClient {
+  const ReclamationClient({
+    required this.motif,
+    required this.etat,
+    this.reponse,
+    this.montantRembourse,
+    required this.creeeLe,
+  });
+
+  final String motif;
+
+  /// « ouverte », « en_cours », « resolue » ou « rejetee ».
+  final String etat;
+  final String? reponse;
+  final double? montantRembourse;
+  final DateTime creeeLe;
+
+  bool get enCours => etat == 'ouverte' || etat == 'en_cours';
+
+  /// La plus récente des réclamations renvoyées par Supabase (liste ou objet).
+  static ReclamationClient? derniere(Object? valeur) {
+    final lignes = valeur is List ? valeur : (valeur == null ? const [] : [valeur]);
+    ReclamationClient? plusRecente;
+    for (final l in lignes) {
+      final r = ReclamationClient(
+        motif: l['motif'] as String,
+        etat: l['etat'] as String,
+        reponse: l['reponse'] as String?,
+        montantRembourse: l['montant_rembourse'] == null ? null : lireNombre(l['montant_rembourse']),
+        creeeLe: DateTime.parse(l['created_at'] as String),
+      );
+      if (plusRecente == null || r.creeeLe.isAfter(plusRecente.creeeLe)) plusRecente = r;
+    }
+    return plusRecente;
+  }
+}
+
+/// Motifs proposés pour signaler un problème (US49).
+const motifsReclamation = [
+  'Plat manquant',
+  'Erreur dans la commande',
+  'Plat froid ou abîmé',
+  'Retard important',
+  'Problème avec le livreur',
+  'Autre problème',
+];

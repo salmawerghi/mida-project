@@ -131,6 +131,64 @@ class FauxServiceMida implements ServiceMida {
         noteLivreur: noteLivreur);
   }
 
+  /// Adresses du client (US47).
+  List<AdresseClient> adresses = [];
+  int _numeroAdresse = 0;
+
+  @override
+  Future<List<AdresseClient>> mesAdresses() async => trierAdresses(adresses);
+
+  @override
+  Future<void> ajouterAdresse({
+    required String libelle,
+    required String rue,
+    required String ville,
+    String? complement,
+    bool parDefaut = false,
+  }) async {
+    if (parDefaut) adresses = [for (final a in adresses) _copieAdresse(a, false)];
+    adresses = [
+      ...adresses,
+      AdresseClient(
+        id: 'nouvelle${++_numeroAdresse}',
+        libelle: libelle,
+        rue: rue,
+        ville: ville,
+        complement: complement,
+        parDefaut: parDefaut,
+      ),
+    ];
+  }
+
+  @override
+  Future<void> supprimerAdresse(String id) async => adresses = [for (final a in adresses) if (a.id != id) a];
+
+  @override
+  Future<void> definirAdresseParDefaut(String id) async =>
+      adresses = [for (final a in adresses) _copieAdresse(a, a.id == id)];
+
+  AdresseClient _copieAdresse(AdresseClient a, bool parDefaut) => AdresseClient(
+      id: a.id, libelle: a.libelle, rue: a.rue, ville: a.ville, complement: a.complement, parDefaut: parDefaut);
+
+  /// Problèmes signalés (US49) ; `erreurReclamation` est levée à la place si elle est fournie.
+  final reclamations = <Map<String, Object?>>[];
+  Object? erreurReclamation;
+
+  @override
+  Future<void> signalerProbleme(String commandeId, {required String motif, String? description}) async {
+    if (erreurReclamation != null) throw erreurReclamation!;
+    reclamations.add({'commande': commandeId, 'motif': motif, 'description': description});
+    final c = suivies[commandeId]!;
+    suivies[commandeId] = avecEtat(c, c.etat,
+        accepteeLe: c.accepteeLe,
+        preteLe: c.preteLe,
+        livreeLe: c.livreeLe,
+        livreurNom: c.livreurNom,
+        noteRestaurant: c.noteRestaurant,
+        noteLivreur: c.noteLivreur,
+        reclamation: ReclamationClient(motif: motif, etat: 'ouverte', creeeLe: DateTime(2026, 11, 19, 21)));
+  }
+
   /// Simule un changement fait par le restaurant (événement temps réel).
   void simulerChangement(CommandeClient c) {
     suivies[c.id] = c;
@@ -197,6 +255,7 @@ CommandeClient avecEtat(
   String? livreurNom,
   int? noteRestaurant,
   int? noteLivreur,
+  ReclamationClient? reclamation,
 }) =>
     CommandeClient(
       id: c.id,
@@ -220,6 +279,7 @@ CommandeClient avecEtat(
       livreurNom: livreurNom,
       noteRestaurant: noteRestaurant,
       noteLivreur: noteLivreur,
+      reclamation: reclamation,
     );
 
 const categoriesTest = [

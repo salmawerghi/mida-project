@@ -51,6 +51,21 @@ abstract class ServiceMida {
     int? noteLivreur,
     String? commentaireLivreur,
   });
+
+  /// Adresses de livraison du client connecté (US47), la principale d'abord.
+  Future<List<AdresseClient>> mesAdresses();
+  Future<void> ajouterAdresse({
+    required String libelle,
+    required String rue,
+    required String ville,
+    String? complement,
+    bool parDefaut = false,
+  });
+  Future<void> supprimerAdresse(String id);
+  Future<void> definirAdresseParDefaut(String id);
+
+  /// Signale un problème sur une commande livrée (US49) ; Mida répond par une notification.
+  Future<void> signalerProbleme(String commandeId, {required String motif, String? description});
 }
 
 class ServiceMidaSupabase implements ServiceMida {
@@ -201,6 +216,58 @@ class ServiceMidaSupabase implements ServiceMida {
       'p_commentaire_restaurant': commentaireRestaurant,
       'p_note_livreur': noteLivreur,
       'p_commentaire_livreur': commentaireLivreur,
+    });
+  }
+
+  @override
+  Future<List<AdresseClient>> mesAdresses() async {
+    final id = _client.auth.currentUser?.id;
+    if (id == null) return const [];
+    final lignes = await _client.from('adresses').select(AdresseClient.colonnes).eq('client_id', id);
+    return trierAdresses([for (final l in lignes) AdresseClient.depuis(l)]);
+  }
+
+  @override
+  Future<void> ajouterAdresse({
+    required String libelle,
+    required String rue,
+    required String ville,
+    String? complement,
+    bool parDefaut = false,
+  }) async {
+    final id = _client.auth.currentUser!.id;
+    // Une seule adresse principale par client (index unique) : l'ancienne est retirée d'abord.
+    if (parDefaut) await _client.from('adresses').update({'par_defaut': false}).eq('client_id', id).eq('par_defaut', true);
+    await _client.from('adresses').insert({
+      'client_id': id,
+      'libelle': libelle.trim(),
+      'rue': rue.trim(),
+      'ville': ville.trim(),
+      'complement': (complement ?? '').trim().isEmpty ? null : complement!.trim(),
+      'par_defaut': parDefaut,
+    });
+  }
+
+  @override
+  Future<void> supprimerAdresse(String id) async {
+    await _client.from('adresses').delete().eq('id', id);
+  }
+
+  @override
+  Future<void> definirAdresseParDefaut(String id) async {
+    final client = _client.auth.currentUser!.id;
+    await _client.from('adresses').update({'par_defaut': false}).eq('client_id', client).eq('par_defaut', true);
+    await _client.from('adresses').update({'par_defaut': true}).eq('id', id);
+  }
+
+  @override
+  Future<void> signalerProbleme(String commandeId, {required String motif, String? description}) async {
+    // La base vérifie (migration US49) : commande livrée depuis moins de 7 jours, une seule réclamation en cours.
+    await _client.from('reclamations').insert({
+      'commande_id': commandeId,
+      'client_id': _client.auth.currentUser!.id,
+      'motif': motif,
+      'description': (description ?? '').trim().isEmpty ? null : description!.trim(),
     });
   }
 }

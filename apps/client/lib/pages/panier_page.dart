@@ -30,6 +30,8 @@ class _PanierPageState extends State<PanierPage> {
   late final TextEditingController _adresse;
   late final TextEditingController _remarque;
   double? _frais;
+  /// Adresses enregistrées du client connecté (US47), proposées en un toucher.
+  List<AdresseClient> _adresses = const [];
   bool _enCours = false;
   String? _erreur;
   bool _initialise = false;
@@ -46,6 +48,22 @@ class _PanierPageState extends State<PanierPage> {
     d.mida.fraisLivraison().then((f) {
       if (mounted) setState(() => _frais = f);
     }).catchError((_) {});
+    _chargerAdresses();
+  }
+
+  /// Adresses enregistrées (US47) ; la principale remplit le champ s'il est vide.
+  Future<void> _chargerAdresses() async {
+    final d = Dependances.of(context);
+    if (d.auth.session == null) return;
+    try {
+      final adresses = await d.mida.mesAdresses();
+      if (!mounted) return;
+      setState(() => _adresses = adresses);
+      final principale = adresses.where((a) => a.parDefaut).firstOrNull;
+      if (principale != null && _adresse.text.trim().isEmpty) _adresse.text = principale.texte;
+    } catch (_) {
+      // les adresses sont un raccourci : le champ reste utilisable sans elles
+    }
   }
 
   @override
@@ -136,6 +154,19 @@ class _PanierPageState extends State<PanierPage> {
                       const SizedBox(height: 12),
                       Text('Livraison', style: textes.titleLarge),
                       const SizedBox(height: 10),
+                      if (_adresses.isNotEmpty) ...[
+                        Wrap(spacing: 8, runSpacing: 4, children: [
+                          for (final a in _adresses)
+                            ChoiceChip(
+                              avatar: const Icon(Icons.place_outlined, size: 18),
+                              label: Text(a.libelle),
+                              tooltip: a.texte,
+                              selected: _adresse.text.trim() == a.texte,
+                              onSelected: _enCours ? null : (_) => setState(() => _adresse.text = a.texte),
+                            ),
+                        ]),
+                        const SizedBox(height: 10),
+                      ],
                       TextFormField(
                         controller: _adresse,
                         enabled: !_enCours,

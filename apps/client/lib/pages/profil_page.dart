@@ -6,6 +6,7 @@ import '../auth/service_auth.dart';
 import '../auth/validation.dart';
 import '../theme.dart';
 import '../widgets/composants.dart';
+import 'adresses_page.dart';
 
 /// Profil du client (maquette « Client · Profil », US24) : nom et téléphone
 /// modifiables, e-mail affiché (il sert d'identifiant), déconnexion.
@@ -180,6 +181,14 @@ class _ProfilPageState extends State<ProfilPage> {
                   if (_erreur != null) ...[const SizedBox(height: 12), MessageErreur(_erreur!)],
                   const SizedBox(height: 20),
                   BoutonRelief(libelle: 'Enregistrer', enCours: _enCours, onPressed: _enregistrer),
+                  const SizedBox(height: 20),
+                  // US47 : adresses de livraison enregistrées
+                  OutlinedButton.icon(
+                    onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AdressesPage())),
+                    icon: const Icon(Icons.place_outlined),
+                    label: const Text('Mes adresses de livraison'),
+                    style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                  ),
                   const SizedBox(height: 28),
                   OutlinedButton.icon(
                     onPressed: _deconnecter,

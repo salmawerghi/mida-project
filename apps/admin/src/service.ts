@@ -21,6 +21,8 @@ export interface Resume {
   clients: number
   restaurantsActifs: number
   livreursActifs: number
+  /** Réclamations des clients pas encore traitées (US49). */
+  reclamationsOuvertes: number
 }
 
 export interface Responsable {
@@ -132,6 +134,8 @@ export interface CategorieAdmin {
   nbRestaurants: number
 }
 
+import type { Reclamation, StatsPlateforme } from './statistiques'
+
 export interface ServiceAdmin {
   /** Administrateur de la session, `null` sans session. Lève une erreur (et déconnecte) pour tout autre compte. */
   compteActuel(): Promise<Compte | null>
@@ -165,6 +169,13 @@ export interface ServiceAdmin {
   ajouterCategorie(nom: string, ordre: number): Promise<void>
   renommerCategorie(id: string, nom: string): Promise<void>
   supprimerCategorie(id: string): Promise<void>
+
+  /** Statistiques globales sur les `jours` derniers jours (US45). */
+  statistiques(jours: number): Promise<StatsPlateforme>
+  /** Réclamations des clients, les plus récentes d'abord (US49). */
+  reclamations(): Promise<Reclamation[]>
+  /** Résout (avec remboursement éventuel) ou rejette une réclamation ; le client est prévenu. */
+  traiterReclamation(id: string, resolue: boolean, reponse: string, montant: number | null): Promise<void>
 }
 
 export const messageNonAdmin =

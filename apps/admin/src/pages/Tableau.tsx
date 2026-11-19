@@ -42,6 +42,11 @@ export default function Tableau() {
             </Link>
           </li>
           <li>
+            <Link to="/reclamations">
+              {r.reclamationsOuvertes} réclamation{r.reclamationsOuvertes > 1 ? 's' : ''} à traiter
+            </Link>
+          </li>
+          <li>
             <Link to="/commandes">
               {r.commandesEnCours} commande{r.commandesEnCours > 1 ? 's' : ''} en cours
             </Link>

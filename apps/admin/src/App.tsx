@@ -9,7 +9,9 @@ import Connexion from './pages/Connexion'
 import Demande from './pages/Demande'
 import Livreurs from './pages/Livreurs'
 import Parametres from './pages/Parametres'
+import Reclamations from './pages/Reclamations'
 import Restaurants from './pages/Restaurants'
+import Statistiques from './pages/Statistiques'
 import Tableau from './pages/Tableau'
 import type { ServiceAdmin } from './service'
 import { FournisseurSession, useSession } from './session'
@@ -39,6 +41,8 @@ export function Routage() {
       <Route path="/clients" element={<PageAdmin titre="Clients" page={<Clients />} />} />
       <Route path="/commandes" element={<PageAdmin titre="Commandes" page={<Commandes />} />} />
       <Route path="/parametres" element={<PageAdmin titre="Paramètres" page={<Parametres />} />} />
+      <Route path="/statistiques" element={<PageAdmin titre="Statistiques" page={<Statistiques />} />} />
+      <Route path="/reclamations" element={<PageAdmin titre="Réclamations" page={<Reclamations />} />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

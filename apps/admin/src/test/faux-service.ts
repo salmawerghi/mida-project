@@ -13,6 +13,7 @@ import {
   type RestaurantAdmin,
   type ServiceAdmin,
 } from '../service'
+import type { Reclamation, StatsPlateforme } from '../statistiques'
 
 /** Faux service : données en mémoire, appels enregistrés. */
 export class FauxService implements ServiceAdmin {
@@ -167,7 +168,50 @@ export class FauxService implements ServiceAdmin {
     clients: 2,
     restaurantsActifs: 1,
     livreursActifs: 1,
+    reclamationsOuvertes: this.reclamationsListe.filter((r) => r.etat === 'ouverte').length,
   }))
+
+  stats: StatsPlateforme = statsTest
+  statistiques = vi.fn(async (jours: number) => {
+    this.action()
+    return { ...this.stats, jours }
+  })
+
+  reclamationsListe: Reclamation[] = [
+    {
+      id: 'rc1',
+      motif: 'Plat manquant',
+      description: 'Il manquait un fricassé dans ma commande.',
+      etat: 'ouverte',
+      reponse: null,
+      montantRembourse: null,
+      creeLe: '2026-11-19T19:30:00Z',
+      traiteeLe: null,
+      commande: { id: 'c1040', numero: 1040, total: 15.5, restaurant: 'Brik Bab Souika', livreeLe: '2026-11-19T19:00:00Z' },
+      client: { nom: 'Amine Belhadj', email: 'amine@mida.test', telephone: '+216 22 145 870' },
+    },
+    {
+      id: 'rc2',
+      motif: 'Retard important',
+      description: null,
+      etat: 'rejetee',
+      reponse: 'La commande a été livrée dans le délai annoncé.',
+      montantRembourse: null,
+      creeLe: '2026-11-15T12:00:00Z',
+      traiteeLe: '2026-11-15T15:00:00Z',
+      commande: { id: 'c1030', numero: 1030, total: 20, restaurant: 'Dar Zitouna', livreeLe: '2026-11-15T11:00:00Z' },
+      client: { nom: 'Leïla Mansour', email: 'leila@mida.test', telephone: null },
+    },
+  ]
+  reclamations = vi.fn(async () => this.reclamationsListe.map((r) => ({ ...r })))
+  traiterReclamation = vi.fn(async (id: string, resolue: boolean, reponse: string, montant: number | null) => {
+    this.action()
+    this.reclamationsListe = this.reclamationsListe.map((r) =>
+      r.id === id
+        ? { ...r, etat: resolue ? 'resolue' : 'rejetee', reponse, montantRembourse: montant, traiteeLe: '2026-11-19T21:00:00Z' }
+        : r,
+    )
+  })
 
   restaurants = vi.fn(async () => this.restaurantsListe.map((r) => ({ ...r })))
   deciderRestaurant = vi.fn(async (id: string, valider: boolean, motif?: string) => {
@@ -220,4 +264,32 @@ export class FauxService implements ServiceAdmin {
   supprimerCategorie = vi.fn(async (id: string) => {
     this.categoriesListe = this.categoriesListe.filter((c) => c.id !== id)
   })
+}
+
+export const statsTest: StatsPlateforme = {
+  jours: 30,
+  commandes: 10,
+  livrees: 6,
+  refusees: 1,
+  annulees: 1,
+  chiffreAffaires: 165,
+  ventesRestaurants: 150,
+  fraisLivraison: 15,
+  commissionPct: 10,
+  commissions: 15,
+  gainsLivreurs: 12,
+  panierMoyen: 27.5,
+  parJour: [
+    { jour: '2026-11-18', commandes: 4, chiffreAffaires: 55 },
+    { jour: '2026-11-19', commandes: 6, chiffreAffaires: 110 },
+  ],
+  topRestaurants: [
+    { nom: 'Dar Zitouna', commandes: 4, ventes: 110 },
+    { nom: 'El Kanoun', commandes: 2, ventes: 40 },
+  ],
+  nouveauxClients: 3,
+  nouveauxLivreurs: 1,
+  nouveauxRestaurants: 2,
+  noteMoyenne: 4.6,
+  reclamationsOuvertes: 1,
 }

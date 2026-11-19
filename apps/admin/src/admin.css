@@ -316,3 +316,111 @@
   gap: 10px;
   align-items: center;
 }
+
+
+/* ------------------------------------------------------------------ */
+/* Statistiques (US45) et réclamations (US49)                         */
+/* ------------------------------------------------------------------ */
+.admin-stats {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
+  gap: 16px;
+  margin-top: 16px;
+}
+@media (max-width: 900px) {
+  .admin-stats {
+    grid-template-columns: 1fr;
+  }
+}
+.admin-traitement {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+.admin-traitement fieldset {
+  border: 1px solid var(--bordure);
+  border-radius: 12px;
+  padding: 10px 14px;
+  display: grid;
+  gap: 6px;
+}
+.etat-reclamation-ouverte,
+.etat-reclamation-en_cours {
+  background: var(--dore-clair);
+  color: #6b4a00;
+}
+.etat-reclamation-resolue {
+  background: #e3f4ea;
+  color: #14552f;
+}
+.etat-reclamation-rejetee {
+  background: #fbe9e5;
+  color: #8f2413;
+}
+
+/* Histogramme d'une seule série */
+.graphique {
+  margin: 0;
+}
+.graphique-titre {
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--nuit);
+}
+.graphique-zone {
+  position: relative;
+}
+.graphique-max {
+  font-size: 12px;
+  color: var(--texte-doux);
+  height: 16px;
+}
+.graphique-barres {
+  display: grid;
+  gap: 2px;
+  height: 180px;
+  align-items: end;
+  border-bottom: 1px solid var(--bordure);
+  background-image: linear-gradient(var(--bordure) 1px, transparent 1px);
+  background-size: 100% 50%;
+}
+.graphique-colonne {
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.graphique-barre {
+  width: min(100%, 22px);
+  background: var(--bleu);
+  border-radius: 4px 4px 0 0;
+}
+.graphique-colonne-active {
+  background: rgba(21, 84, 192, 0.06);
+}
+.graphique-colonne-active .graphique-barre {
+  background: #0b3684;
+}
+.graphique-axe {
+  display: grid;
+  gap: 2px;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--texte-doux);
+  white-space: nowrap;
+}
+.graphique-bulle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  background: var(--nuit);
+  color: #fff;
+  border-radius: 10px;
+  font-size: 13px;
+  pointer-events: none;
+}

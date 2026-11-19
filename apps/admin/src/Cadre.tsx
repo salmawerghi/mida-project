@@ -11,6 +11,8 @@ const rubriques: [string, string][] = [
   ['/livreurs', 'Livreurs'],
   ['/clients', 'Clients'],
   ['/commandes', 'Commandes'],
+  ['/reclamations', 'Réclamations'],
+  ['/statistiques', 'Statistiques'],
   ['/parametres', 'Paramètres'],
 ]
 

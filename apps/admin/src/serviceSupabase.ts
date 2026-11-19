@@ -16,6 +16,7 @@ import {
   type Resume,
   type ServiceAdmin,
 } from './service'
+import { lireStatsPlateforme, type EtatReclamation, type Reclamation, type StatsPlateforme } from './statistiques'
 
 type Ligne = Record<string, unknown>
 
@@ -88,7 +89,7 @@ export class ServiceAdminSupabase implements ServiceAdmin {
     aujourdhui.setHours(0, 0, 0, 0)
     const ilYa7j = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString()
     const [restaurantsEnAttente, livreursEnAttente, commandesAujourdhui, commandesEnCours, commandes7j, refusees7j,
-      clients, restaurantsActifs, livreursActifs] = await Promise.all([
+      clients, restaurantsActifs, livreursActifs, reclamationsOuvertes] = await Promise.all([
       this.compter(t('restaurants').eq('etat', 'en_attente')),
       this.compter(t('profiles').eq('role', 'livreur').eq('etat_compte', 'en_attente')),
       this.compter(t('commandes').gte('created_at', aujourdhui.toISOString())),
@@ -98,6 +99,7 @@ export class ServiceAdminSupabase implements ServiceAdmin {
       this.compter(t('profiles').eq('role', 'client')),
       this.compter(t('restaurants').eq('etat', 'actif')),
       this.compter(t('profiles').eq('role', 'livreur').eq('etat_compte', 'actif')),
+      this.compter(t('reclamations').in('etat', ['ouverte', 'en_cours'])),
     ])
     const { data: livrees, error } = await this.client
       .from('commandes')
@@ -117,6 +119,7 @@ export class ServiceAdminSupabase implements ServiceAdmin {
       clients,
       restaurantsActifs,
       livreursActifs,
+      reclamationsOuvertes,
     }
   }
 
@@ -342,6 +345,62 @@ export class ServiceAdminSupabase implements ServiceAdmin {
   async supprimerCategorie(id: string): Promise<void> {
     // les restaurants de cette catégorie restent, sans catégorie (on delete set null)
     const { error } = await this.client.from('categories_restaurant').delete().eq('id', id)
+    if (error) throw error
+  }
+
+  async statistiques(jours: number): Promise<StatsPlateforme> {
+    // Fonction de la base (migration US45), réservée aux administrateurs.
+    const { data, error } = await this.client.rpc('statistiques_plateforme', { p_jours: jours })
+    if (error) throw error
+    return lireStatsPlateforme((data ?? {}) as Record<string, unknown>)
+  }
+
+  async reclamations(): Promise<Reclamation[]> {
+    const { data, error } = await this.client
+      .from('reclamations')
+      .select(
+        'id, motif, description, etat, reponse, montant_rembourse, created_at, traitee_le, ' +
+          'commandes(id, numero, total, livree_le, restaurants(nom)), client:profiles!reclamations_client_id_fkey(nom, email, telephone)',
+      )
+      .order('created_at', { ascending: false })
+      .limit(300)
+    if (error) throw error
+    return ((data ?? []) as unknown as Ligne[]).map((r) => {
+      const c = premier(r.commandes) ?? {}
+      const client = premier(r.client) ?? {}
+      return {
+        id: r.id as string,
+        motif: r.motif as string,
+        description: (r.description as string | null) ?? null,
+        etat: r.etat as EtatReclamation,
+        reponse: (r.reponse as string | null) ?? null,
+        montantRembourse: r.montant_rembourse === null || r.montant_rembourse === undefined ? null : nombre(r.montant_rembourse),
+        creeLe: r.created_at as string,
+        traiteeLe: (r.traitee_le as string | null) ?? null,
+        commande: {
+          id: (c.id as string) ?? '',
+          numero: nombre(c.numero),
+          total: nombre(c.total),
+          restaurant: (premier(c.restaurants)?.nom as string | undefined) ?? '—',
+          livreeLe: (c.livree_le as string | null) ?? null,
+        },
+        client: {
+          nom: (client.nom as string | undefined) ?? '—',
+          email: (client.email as string | undefined) ?? '',
+          telephone: (client.telephone as string | null | undefined) ?? null,
+        },
+      }
+    })
+  }
+
+  async traiterReclamation(id: string, resolue: boolean, reponse: string, montant: number | null): Promise<void> {
+    // Fonction de la base (migration US49) : vérifie l'état et le montant, prévient le client.
+    const { error } = await this.client.rpc('traiter_reclamation', {
+      p_reclamation: id,
+      p_resolue: resolue,
+      p_reponse: reponse,
+      p_montant: montant,
+    })
     if (error) throw error
   }
 }
